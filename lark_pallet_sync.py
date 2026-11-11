@@ -119,6 +119,46 @@ def plain_text(value):
     return str(value or "")
 
 
+def norm_key(s):
+    """Collapse all whitespace runs to a single space (and strip)."""
+    return re.sub(r"\s+", " ", str(s or "")).strip()
+
+
+def field_by_name(fields, name):
+    """Look a field up by name, tolerating extra whitespace in the
+    table's actual field name. PROVEN 2026-11-12: this table's Batch#
+    key is 'Batch#' + MANY spaces + '<BU>-...' — an exact lookup
+    with the single-space display name returns None for every row,
+    which is why dry runs #2/#3/#5/#6 all found 0 candidates even
+    though the values are present. Exact match first, then a
+    whitespace-collapsed match."""
+    if name in fields:
+        return fields[name]
+    want = norm_key(name)
+    for k, v in fields.items():
+        if norm_key(k) == want:
+            return v
+    return None
+
+
+def to_number(value):
+    """Number fields arrive as strings ('72') in this table, not
+    JSON numbers — coerce strings (and numbers) to int/float."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        try:
+            return float(s) if ("." in s or "e" in s.lower()) else int(s)
+        except ValueError:
+            return None
+    return None
+
+
 def parse_date_ms(raw):
     """Bitable date fields arrive as epoch ms; return YYYY-MM-DD (HKT)
     or None if unparseable."""
@@ -191,7 +231,8 @@ def read_rows(token, app_token, table_id, max_pages):
             if items:
                 f0 = items[0].get("fields") or {}
                 log(f"Sample row field keys: {sorted(f0.keys())}")
-                log(f"Sample row Batch# raw: {f0.get(F_BATCH)!r}")
+                log(f"Sample row Batch# raw: "
+                    f"{field_by_name(f0, F_BATCH)!r}")
                 # DIAGNOSTIC (2026-11-12 01:41): dry run #5 on the
                 # fixed commit still read Batch# as None on every
                 # row. Log the whole first-row fields dict plus how
@@ -234,13 +275,15 @@ def read_rows(token, app_token, table_id, max_pages):
     # Batch# / Business Unit at all, and what a non-null Batch#
     # value looks like (string vs rich-text list).
     n_batch = sum(1 for r in rows
-                  if (r.get("fields") or {}).get(F_BATCH) is not None)
+                  if field_by_name(r.get("fields") or {}, F_BATCH)
+                  is not None)
     n_bu = sum(1 for r in rows
-               if (r.get("fields") or {}).get(F_BU) is not None)
+               if field_by_name(r.get("fields") or {}, F_BU)
+               is not None)
     log(f"Rows with non-null Batch#: {n_batch}/{len(rows)}; "
         f"non-null Business Unit: {n_bu}/{len(rows)}")
     for r in rows:
-        v = (r.get("fields") or {}).get(F_BATCH)
+        v = field_by_name(r.get("fields") or {}, F_BATCH)
         if v is not None:
             log(f"Example non-null Batch# value: {v!r} "
                 f"(record {r.get('record_id')})")
@@ -286,22 +329,22 @@ def select_candidates(rows, worker_keys, today, days_back):
     for row in rows:
         f = row.get("fields") or {}
         rid = row.get("record_id")
-        batch_raw = plain_text(f.get(F_BATCH)).strip()
+        batch_raw = plain_text(field_by_name(f, F_BATCH)).strip()
         if not batch_raw:
             skipped.append(("", f"row {rid}: empty Batch#"))
             continue
         norm = normalize_batch(batch_raw)
-        if plain_text(f.get(F_BU)).strip() != "Labware":
+        if plain_text(field_by_name(f, F_BU)).strip() != "Labware":
             skipped.append((batch_raw, "BU is not Labware"))
             continue
         if not is_pallet_batch(norm):
             skipped.append((batch_raw, "not P-type Batch#"))
             continue
-        typ = plain_text(f.get(F_TYPE)).strip()
+        typ = plain_text(field_by_name(f, F_TYPE)).strip()
         if typ and typ != "Dock Receipt":
             skipped.append((batch_raw, f"Type={typ!r} (not Dock Receipt)"))
             continue
-        dock = parse_date_ms(f.get(F_DOCK_DATE))
+        dock = parse_date_ms(field_by_name(f, F_DOCK_DATE))
         if not dock:
             skipped.append((batch_raw, "no Dock Receipt Date"))
             continue
@@ -315,27 +358,28 @@ def select_candidates(rows, worker_keys, today, days_back):
                             f"Dock Receipt Date {dock} outside "
                             f"+/-{days_back}d window"))
             continue
-        height = f.get(F_HEIGHT)
-        if not isinstance(height, (int, float)) or not (0 < height <= 1000):
+        # Height/Length/Width arrive as strings ('72') in this table.
+        height = to_number(plain_text(field_by_name(f, F_HEIGHT)))
+        if height is None or not (0 < height <= 1000):
             skipped.append((batch_raw, f"bad Height {height!r}"))
             continue
         if norm in worker_keys:
             skipped.append((batch_raw, "already in stock / pending"))
             continue
-        length = f.get(F_LENGTH)
-        width = f.get(F_WIDTH)
-        ref = plain_text(f.get(F_REFERENCE)).strip()
+        length = to_number(plain_text(field_by_name(f, F_LENGTH)))
+        width = to_number(plain_text(field_by_name(f, F_WIDTH)))
+        ref = plain_text(field_by_name(f, F_REFERENCE)).strip()
         candidates.append({
             "palletId": batch_raw,
             "heightCm": height,
             "date": dock,
             "dockReceiptDate": dock,
-            "location": plain_text(f.get(F_LOCATION)).strip(),
+            "location": plain_text(field_by_name(f, F_LOCATION)).strip(),
             "businessUnit": "Labware",
             "reference": "" if ref in ("", "N/A") else ref,
-            "lengthCm": length if isinstance(length, (int, float))
+            "lengthCm": length if length is not None
                         and 0 < length <= 1000 else 120,
-            "widthCm": width if isinstance(width, (int, float))
+            "widthCm": width if width is not None
                        and 0 < width <= 1000 else 100,
         })
     return candidates, skipped

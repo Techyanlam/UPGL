@@ -168,6 +168,26 @@ def plain_text(value):
     return str(value or "")
 
 
+def norm_key(s):
+    """Collapse all whitespace runs to a single space (and strip)."""
+    return re.sub(r"\s+", " ", str(s or "")).strip()
+
+
+def field_by_name(fields, name):
+    """Look a field up by name, tolerating extra whitespace in the
+    table's actual field name. PROVEN 2026-11-12 on Dock Receipt:
+    its Batch# key is 'Batch#' + MANY spaces + '<BU>-...' — an exact
+    lookup with the single-space display name returns None for every
+    row. Exact match first, then a whitespace-collapsed match."""
+    if name in fields:
+        return fields[name]
+    want = norm_key(name)
+    for k, v in fields.items():
+        if norm_key(k) == want:
+            return v
+    return None
+
+
 def parse_date_ms(raw):
     """Bitable date fields arrive as epoch ms; return YYYY-MM-DD (HKT)
     or None if unparseable."""
@@ -431,8 +451,9 @@ def main():
     existing_pairs = set()
     for row in existing_rows:
         f = row.get("fields") or {}
-        batch = normalize_batch(plain_text(f.get(F_BATCH)).strip())
-        dmd = parse_date_ms(f.get(F_DMD))
+        batch = normalize_batch(
+            plain_text(field_by_name(f, F_BATCH)).strip())
+        dmd = parse_date_ms(field_by_name(f, F_DMD))
         if batch and dmd:
             existing_pairs.add((batch, dmd))
     log(f"Pallet record existing (Batch#, date) pairs: "
