@@ -1,1 +1,62 @@
+# ADD THIS FILE VIA THE GITHUB WEB EDITOR — The GitHub App cannot
+# push .github/workflows/*.yml files.
+# Copy this file to .github/workflows/lark-pallet-record-sync.yml in
+# the repo (web editor: repo -> Add file -> Create new file -> paste
+# -> Commit). It runs every night at 20:00 HKT and copies the
+# website's CURRENT in-stock table into the Lark Base "Pallet
+# record" table (append-only: old rows are kept, one new row per
+# pallet per night), plus any new website activity entries into the
+# "活動記錄" table (append-only, never duplicated).
+#
+# Repo secrets needed (repo -> Settings -> Secrets and variables ->
+# Actions -> New repository secret):
+#   LARK_APP_ID       Lark self-built app id (e.g. "Yan Lam的智能助手")
+#   LARK_APP_SECRET   same app's secret
+#   LARK_APP_TOKEN    Base app_token: the string after base/ in the
+#                     "UPGL inbound and cycle count" Base URL
+#                     (QDo5bSOZraNgEhsRC7flOUMggPe)
+#   WORKER_URL is a plain value in this file (public Worker URL).
+# No WORKER_SYNC_SECRET is needed: this job only READS the Worker
+# state (GET /state), it never writes to the Worker.
 
+name: Lark pallet record sync (website -> Pallet record, nightly)
+
+on:
+  schedule:
+    # 20:00 HKT every night (12:00 UTC)
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (list what would be appended, do not write)"
+        type: boolean
+        default: true
+
+# Serialize runs: the Pallet record dedupe check reads the table and
+# then appends — two overlapping runs could both pass the check and
+# double-add the same night's rows. Never run two record syncs in
+# parallel.
+concurrency:
+  group: lark-pallet-record-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sync website stock snapshot to Pallet record
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          WORKER_URL: https://upg-pallet-stock.yan-lam.workers.dev
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 lark_pallet_record_sync.py --dry-run
+          else
+            python3 lark_pallet_record_sync.py
+          fi
