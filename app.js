@@ -243,6 +243,20 @@
         });
       });
       td.appendChild(input); td.appendChild(btn);
+      var locInput = document.createElement('input');
+      locInput.type = 'text';
+      locInput.placeholder = '新位置'; locInput.style.width = '110px';
+      var locBtn = document.createElement('button');
+      locBtn.className = 'btn small'; locBtn.type = 'button'; locBtn.textContent = '改位置';
+      locBtn.addEventListener('click', function () {
+        var loc = locInput.value.trim();
+        if (!loc) { showError('請輸入新位置。'); return; }
+        hideError();
+        withBusy(locBtn, function () {
+          return apiPost({ action: 'updateLocation', palletId: b.palletId, newLocation: loc, date: todayStr() });
+        });
+      });
+      td.appendChild(locInput); td.appendChild(locBtn);
       tr.appendChild(td);
       body.appendChild(tr);
     });
@@ -278,7 +292,7 @@
 
   /* ---------- 活動記錄 ---------- */
   var ACT_LABEL = {
-    depart: '出倉', updateHeight: '改高度', add: '入倉', restore: '還原',
+    depart: '出倉', updateHeight: '改高度', updateLocation: '改位置', add: '入倉', restore: '還原',
     pending: '待確認', confirm: '確認加入', reject: '唔加入'
   };
   function renderActivity() {
