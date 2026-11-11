@@ -1,0 +1,66 @@
+# ADD THIS FILE VIA THE GITHUB WEB EDITOR — The GitHub App cannot
+# push .github/workflows/*.yml files.
+# Copy this file to .github/workflows/lark-pallet-sync.yml in the repo
+# (web editor: repo -> Add file -> Create new file -> paste -> Commit).
+# Then the Lark Base automation (Dock Receipt new row -> HTTP POST to
+# https://api.github.com/repos/Techyanlam/UPGL/dispatches
+# with {"event_type":"lark-new-pallet"}) triggers this workflow, which
+# reads the new rows and puts them in the website's PENDING queue
+# (a colleague confirms them in the website before they join stock).
+#
+# Repo secrets needed (repo -> Settings -> Secrets and variables ->
+# Actions -> New repository secret):
+#   LARK_APP_ID       Lark self-built app id (e.g. "Yan Lam的智能助手")
+#   LARK_APP_SECRET   same app's secret
+#   LARK_APP_TOKEN    Base app_token: the string after base/ in the
+#                     "UPGL inbound and cycle count" Base URL
+#   LARK_TABLE_ID     Dock Receipt table id (table= parameter in the
+#                     Base URL, e.g. tblK2lbIsUjKunXz)
+#   WORKER_SYNC_SECRET  must match the Worker secret SYNC_SECRET set in
+#                     the Cloudflare Dashboard (Worker upg-pallet-stock
+#                     -> Settings -> Variables). If the Worker secret is
+#                     not set yet, the sync still works (Worker accepts
+#                     without it) — set both to the same value to lock
+#                     it down.
+
+name: Lark pallet sync (Dock Receipt -> pending)
+
+on:
+  repository_dispatch:
+    types: [lark-new-pallet]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (list what would sync, do not write)"
+        type: boolean
+        default: true
+
+# Serialize runs: the Worker keeps all state in one KV key, and KV
+# reads can lag writes by up to 30s — two overlapping runs could
+# overwrite each other's updates. Never run two syncs in parallel.
+concurrency:
+  group: lark-pallet-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sync new Labware pallets to pending queue
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          LARK_TABLE_ID: ${{ secrets.LARK_TABLE_ID }}
+          WORKER_URL: https://upg-pallet-stock.yan-lam.workers.dev
+          WORKER_SYNC_SECRET: ${{ secrets.WORKER_SYNC_SECRET }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 lark_pallet_sync.py --dry-run
+          else
+            python3 lark_pallet_sync.py
+          fi
