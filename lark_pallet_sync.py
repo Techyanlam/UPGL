@@ -31,7 +31,7 @@ WORKER_URL which is public):
   LARK_APP_ID, LARK_APP_SECRET, LARK_APP_TOKEN, LARK_TABLE_ID,
   WORKER_URL, WORKER_SYNC_SECRET (optional until Yan sets the matching
   Worker secret SYNC_SECRET), SYNC_DAYS_BACK (optional, default 14),
-  SYNC_MAX_PAGES (optional, default 50).
+  SYNC_MAX_PAGES (optional, default 100).
 """
 
 import argparse
@@ -42,6 +42,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -60,7 +61,7 @@ F_REFERENCE = "Reference"
 F_TYPE = "Type"
 
 DEFAULT_DAYS_BACK = 14
-DEFAULT_MAX_PAGES = 50
+DEFAULT_MAX_PAGES = 100
 
 # Cloudflare's edge in front of workers.dev blocks the default urllib
 # User-Agent ("Python-urllib/x.y") with 403 — the Worker itself only
@@ -151,22 +152,42 @@ def is_pallet_batch(norm):
 
 
 def read_rows(token, app_token, table_id, max_pages):
-    """All Dock Receipt rows, paginated. Filtering happens client-side
-    (same lesson as the reimbursement sync: do not rely on the search
-    API's field-operator support)."""
+    """All Dock Receipt rows, paginated via the GET list-records
+    endpoint. Filtering happens client-side (same lesson as the
+    reimbursement sync: do not rely on the search API's
+    field-operator support).
+
+    NOTE (2026-11-12): the POST /records/search pagination did NOT
+    advance — dry run #2 re-read the same first 500 rows 50 times
+    (has_more stayed true while every page was a duplicate of page
+    1), so the scan only ever saw 500 distinct rows and every one
+    of them showed an empty Batch#. The GET list endpoint is the
+    canonical paginated read; the stuck-page guard below stops the
+    scan instead of burning pages if a cursor ever stops advancing,
+    and the first-page diagnostics (table total + sample field keys
+    + raw Batch#) prove which table is being read and how its
+    fields arrive."""
     rows, page_token, pages = [], None, 0
     seen_ids = set()
     while True:
-        body = {"page_size": 100}
+        qs = {"page_size": 100}
         if page_token:
-            body["page_token"] = page_token
-        r = lark_call("POST",
-                      f"/bitable/v1/apps/{app_token}/tables/{table_id}"
-                      f"/records/search", body, token)
+            qs["page_token"] = page_token
+        url = (f"{LARK_API}/bitable/v1/apps/{app_token}/tables/"
+               f"{table_id}/records?{urllib.parse.urlencode(qs)}")
+        r = http_json("GET", url, None,
+                      {"Authorization": f"Bearer {token}"})
         if r.get("code") != 0:
-            raise RuntimeError(f"Dock Receipt records search failed: {r}")
+            raise RuntimeError(f"Dock Receipt records list failed: {r}")
         data = r.get("data") or {}
         items = data.get("items") or []
+        if pages == 0:
+            log(f"Table total rows: {data.get('total')}")
+            if items:
+                f0 = items[0].get("fields") or {}
+                log(f"Sample row field keys: {sorted(f0.keys())}")
+                log(f"Sample row Batch# raw: {f0.get(F_BATCH)!r}")
+        new_this_page = 0
         dupes = 0
         for item in items:
             rid = item.get("record_id")
@@ -175,10 +196,16 @@ def read_rows(token, app_token, table_id, max_pages):
                     dupes += 1
                     continue
                 seen_ids.add(rid)
+                new_this_page += 1
             rows.append(item)
         if dupes:
             log(f"Page {pages + 1}: dropped {dupes} duplicate row(s)")
         pages += 1
+        if new_this_page == 0 and data.get("has_more"):
+            log(f"WARNING: page {pages} returned no new rows but "
+                f"has_more is true — pagination is not advancing; "
+                f"stopping the scan.")
+            break
         if not data.get("has_more") or pages >= max_pages:
             break
         page_token = data.get("page_token")
