@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UPG Pallet 倉存管理</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>UPG Pallet 倉存管理</h1>
+  <p>在倉、出倉、入倉及待確認新貨 — 數據由 Cloudflare Worker 即時提供</p>
+</header>
+<main>
+  <div id="errorBox" class="error" style="display:none"></div>
+  <div id="loadingBox" class="loading">載入中…</div>
+
+  <div id="app" style="display:none">
+    <section class="stats">
+      <div class="stat"><div class="label">在倉板數</div><div class="value" id="statInStock">–</div></div>
+      <div class="stat"><div class="label">總體積 (CBM)</div><div class="value" id="statVolume">–</div></div>
+      <div class="stat"><div class="label">今日出倉</div><div class="value" id="statToday">–</div></div>
+      <div class="stat"><div class="label">待確認</div><div class="value warn" id="statPending">–</div></div>
+    </section>
+
+    <nav class="tabs">
+      <button id="tabDaily" class="active" type="button">每日更新</button>
+      <button id="tabExcel" type="button">Excel 版面</button>
+    </nav>
+
+    <!-- 每日更新 -->
+    <section id="pageDaily">
+      <div class="card">
+        <h2>出倉登記</h2>
+        <label for="departSearch">板號（輸入任何一部分即可搜尋，只列在倉板）</label>
+        <div class="search-box">
+          <input id="departSearch" type="text" placeholder="例如：20261105、P001、2026-11-05" autocomplete="off">
+          <div id="departDropdown" class="dropdown" style="display:none"></div>
+        </div>
+        <div id="departSelected" class="selected" style="display:none"></div>
+        <div class="form-row">
+          <div>
+            <label for="departDate">出倉日期</label>
+            <input id="departDate" type="date">
+          </div>
+          <div>
+            <label for="departHeight">新高度 (cm)（如有改動先填，留空即沿用原高度）</label>
+            <input id="departHeight" type="number" min="1" step="1" placeholder="留空 = 不變">
+          </div>
+        </div>
+        <button id="departBtn" class="btn" type="button" disabled>確認出倉</button>
+      </div>
+
+      <div class="card">
+        <h2>待確認新貨（Lark 同步）</h2>
+        <p style="font-size:13px;color:#4b5563;margin-top:0">Lark 同步嚟嘅新板唔會即刻入倉，請逐項核對後按「確認加入」先正式入倉；唔啱嘅按「唔加入」剔除。</p>
+        <div id="pendingList"></div>
+      </div>
+
+      <div class="card">
+        <h2>在倉表</h2>
+        <input id="stockSearch" type="text" placeholder="搜尋 Batch# 或位置…" autocomplete="off">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Batch#</th><th>位置</th><th>收貨日期</th><th>BU</th><th>尺寸 (cm)</th><th>體積 (CBM)</th><th>改高度</th></tr></thead>
+            <tbody id="stockBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>新板入倉</h2>
+        <div class="form-row">
+          <div><label for="addPalletId">Batch# *</label><input id="addPalletId" type="text" placeholder="例如：UPG-20261111-P001"></div>
+          <div><label for="addHeight">高度 (cm) *</label><input id="addHeight" type="number" min="1" step="1"></div>
+        </div>
+        <div class="form-row">
+          <div><label for="addDate">日期 *</label><input id="addDate" type="date"></div>
+          <div><label for="addLocation">位置</label><input id="addLocation" type="text" placeholder="例如：R1/6"></div>
+        </div>
+        <div class="form-row">
+          <div><label for="addDockDate">收貨日期</label><input id="addDockDate" type="date"></div>
+          <div><label for="addBU">Business Unit</label><input id="addBU" type="text" placeholder="例如：Labware"></div>
+        </div>
+        <div class="form-row">
+          <div><label for="addReference">Reference</label><input id="addReference" type="text"></div>
+          <div><label for="addLength">長 (cm)</label><input id="addLength" type="number" min="1" step="1" value="120"></div>
+        </div>
+        <div class="form-row">
+          <div><label for="addWidth">闊 (cm)</label><input id="addWidth" type="number" min="1" step="1" value="100"></div>
+          <div></div>
+        </div>
+        <p style="font-size:13px;color:#4b5563">直接入倉，唔經待確認清單。</p>
+        <button id="addBtn" class="btn" type="button">確認入倉</button>
+      </div>
+
+      <div class="card">
+        <h2>已出倉清單</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Batch#</th><th>位置</th><th>收貨日期</th><th>出倉日期</th><th>體積 (CBM)</th><th></th></tr></thead>
+            <tbody id="departedBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>活動記錄</h2>
+        <ul id="activityList" class="activity"></ul>
+      </div>
+    </section>
+
+    <!-- Excel 版面 -->
+    <section id="pageExcel" style="display:none">
+      <div class="card">
+        <h2>Excel 版面</h2>
+        <div class="toolbar">
+          <select id="excelFilter">
+            <option value="all">全部</option>
+            <option value="in">在倉</option>
+            <option value="out">已出倉</option>
+          </select>
+          <input id="excelSearch" type="text" placeholder="搜尋 Batch#…" autocomplete="off">
+          <button id="csvBtn" class="btn" type="button">匯出 CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Daily Measurement Date</th><th>Timestamp（位置）</th><th>Dock Receipt Date</th>
+              <th>Business Unit</th><th>Reference</th><th>Batch#</th><th>Date of Measurement</th>
+              <th>Length</th><th>Width</th><th>Height</th><th>Volume</th><th>Ship Date</th><th>Remark</th>
+            </tr></thead>
+            <tbody id="excelBody"></tbody>
+          </table>
+        </div>
+        <div class="totals" id="excelTotals"></div>
+      </div>
+    </section>
+  </div>
+</main>
+<footer>UPG Pallet 倉存管理 · 前端 → Cloudflare Worker → KV · Lark 同步經 GitHub Actions</footer>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

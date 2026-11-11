@@ -1,0 +1,57 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", "PingFang HK", "Microsoft JhengHei", sans-serif; background: #f2f4f7; color: #1f2937; line-height: 1.5; }
+header { background: #1e3a5f; color: #fff; padding: 16px; }
+header h1 { margin: 0 0 4px; font-size: 20px; }
+header p { margin: 0; font-size: 13px; opacity: .85; }
+main { max-width: 1080px; margin: 0 auto; padding: 16px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat { background: #fff; border-radius: 8px; padding: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.stat .label { font-size: 13px; color: #6b7280; }
+.stat .value { font-size: 26px; font-weight: 700; color: #1e3a5f; }
+.stat .value.warn { color: #b45309; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tabs button { flex: 1; padding: 10px; border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; font-size: 15px; cursor: pointer; }
+.tabs button.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+.card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.card h2 { margin: 0 0 12px; font-size: 17px; color: #1e3a5f; }
+.card h3 { margin: 16px 0 8px; font-size: 15px; }
+label { display: block; font-size: 13px; color: #4b5563; margin: 8px 0 4px; }
+input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 15px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid #1e3a5f; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+button { cursor: pointer; }
+.btn { background: #1e3a5f; color: #fff; border: none; border-radius: 6px; padding: 10px 16px; font-size: 15px; margin-top: 12px; }
+.btn.secondary { background: #e5e7eb; color: #1f2937; }
+.btn.danger { background: #b91c1c; }
+.btn.small { padding: 6px 10px; font-size: 13px; margin: 0 4px 0 0; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.search-box { position: relative; }
+.dropdown { position: absolute; z-index: 10; left: 0; right: 0; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; max-height: 240px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+.dropdown div { padding: 10px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+.dropdown div:hover { background: #eff6ff; }
+.selected { background: #eff6ff; border: 1px solid #93c5fd; border-radius: 6px; padding: 10px; margin-top: 8px; font-size: 14px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 6px; text-align: left; white-space: nowrap; }
+th { background: #f8fafc; color: #374151; }
+.pending-item { border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.pending-item .title { font-weight: 700; font-size: 15px; }
+.pending-item .meta { font-size: 13px; color: #4b5563; margin: 4px 0 8px; }
+.pending-item .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pending-item input { width: auto; flex: 1; min-width: 140px; }
+.empty { color: #6b7280; padding: 12px 0; }
+.error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.loading { color: #4b5563; padding: 24px 0; text-align: center; }
+.notice { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
+.totals { font-weight: 700; margin-top: 12px; }
+.activity li { margin-bottom: 6px; font-size: 14px; }
+.activity { padding-left: 18px; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.toolbar input, .toolbar select { width: auto; flex: 1; min-width: 140px; }
+.toolbar .btn { margin-top: 0; }
+footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 16px; }
+@media (max-width: 640px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .form-row { grid-template-columns: 1fr; }
+  header h1 { font-size: 18px; }
+}
