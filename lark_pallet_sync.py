@@ -51,13 +51,13 @@ LARK_API = "https://open.larksuite.com/open-apis"
 
 # Dock Receipt field names (must match the Base table exactly).
 F_BU = "Business Unit"
-F_BATCH = "Batch#"
+F_BATCH = "Batch# <BU>-<Date Code>-<Packaging Type><3 Digit Sequential Number>"
 F_LENGTH = "Length (cm)"
 F_WIDTH = "Width (cm)"
 F_HEIGHT = "Height (cm)"
 F_DOCK_DATE = "Dock Receipt Date"
 F_LOCATION = "Location"
-F_REFERENCE = "Reference"
+F_REFERENCE = "Reference (PO# or other Reference#)"
 F_TYPE = "Type"
 
 DEFAULT_DAYS_BACK = 14
@@ -160,13 +160,18 @@ def read_rows(token, app_token, table_id, max_pages):
     NOTE (2026-11-12): the POST /records/search pagination did NOT
     advance — dry run #2 re-read the same first 500 rows 50 times
     (has_more stayed true while every page was a duplicate of page
-    1), so the scan only ever saw 500 distinct rows and every one
-    of them showed an empty Batch#. The GET list endpoint is the
-    canonical paginated read; the stuck-page guard below stops the
-    scan instead of burning pages if a cursor ever stops advancing,
-    and the first-page diagnostics (table total + sample field keys
-    + raw Batch#) prove which table is being read and how its
-    fields arrive."""
+    1), so the scan only ever saw 500 distinct rows. The empty
+    Batch# on every row was NOT a pagination artefact: dry run #3
+    (GET list, correct table, 4,854 distinct rows) still read
+    Batch# as None on all rows, because F_BATCH used the short name
+    "Batch#" while the API keys the field by its full name
+    "Batch# <BU>-<Date Code>-<Packaging Type><3 Digit Sequential
+    Number>" (same for Reference). Fixed 2026-11-12 01:30.
+    The GET list endpoint is the canonical paginated read; the
+    stuck-page guard below stops the scan instead of burning pages
+    if a cursor ever stops advancing, and the first-page diagnostics
+    (table total + sample field keys + raw Batch#) prove which table
+    is being read and how its fields arrive."""
     rows, page_token, pages = [], None, 0
     seen_ids = set()
     while True:
