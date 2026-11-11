@@ -35,6 +35,7 @@ WORKER_URL which is public):
 """
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -61,6 +62,15 @@ F_TYPE = "Type"
 DEFAULT_DAYS_BACK = 14
 DEFAULT_MAX_PAGES = 50
 
+# Cloudflare's edge in front of workers.dev blocks the default urllib
+# User-Agent ("Python-urllib/x.y") with 403 — the Worker itself only
+# checks Origin, and urllib sends none (which passes). Proven
+# 2026-11-12: curl with Python-urllib UA -> 403, browser UA -> 200.
+# Send a browser User-Agent on every request the script makes.
+USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+              "AppleWebKit/537.36 (KHTML, like Gecko) "
+              "Chrome/120.0.0.0 Safari/537.36")
+
 
 def log(msg):
     print(f"[pallet-sync] {msg}", flush=True)
@@ -68,8 +78,10 @@ def log(msg):
 
 def http_json(method, url, body=None, headers=None, timeout=120):
     data = json.dumps(body).encode() if body is not None else None
+    merged = {"User-Agent": USER_AGENT}
+    merged.update(headers or {})
     req = urllib.request.Request(url, method=method, data=data,
-                                 headers=headers or {})
+                                 headers=merged)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.load(resp)
@@ -143,6 +155,7 @@ def read_rows(token, app_token, table_id, max_pages):
     (same lesson as the reimbursement sync: do not rely on the search
     API's field-operator support)."""
     rows, page_token, pages = [], None, 0
+    seen_ids = set()
     while True:
         body = {"page_size": 100}
         if page_token:
@@ -153,13 +166,25 @@ def read_rows(token, app_token, table_id, max_pages):
         if r.get("code") != 0:
             raise RuntimeError(f"Dock Receipt records search failed: {r}")
         data = r.get("data") or {}
-        rows.extend(data.get("items") or [])
+        items = data.get("items") or []
+        dupes = 0
+        for item in items:
+            rid = item.get("record_id")
+            if rid:
+                if rid in seen_ids:
+                    dupes += 1
+                    continue
+                seen_ids.add(rid)
+            rows.append(item)
+        if dupes:
+            log(f"Page {pages + 1}: dropped {dupes} duplicate row(s)")
         pages += 1
         if not data.get("has_more") or pages >= max_pages:
             break
         page_token = data.get("page_token")
         time.sleep(0.5)
-    log(f"Dock Receipt rows read: {len(rows)} ({pages} page(s))")
+    log(f"Dock Receipt rows read: {len(rows)} distinct "
+        f"({pages} page(s))")
     if pages >= max_pages:
         log(f"WARNING: hit MAX_PAGES={max_pages} — older rows were not "
             f"scanned. Raise SYNC_MAX_PAGES if the table keeps growing.")
@@ -168,10 +193,24 @@ def read_rows(token, app_token, table_id, max_pages):
 
 def get_worker_keys(worker_url):
     """Normalized Batch# keys already in stock or pending (the Worker's
-    state is the dedupe source of truth)."""
-    with urllib.request.urlopen(worker_url.rstrip("/") + "/state",
-                                timeout=60) as resp:
-        d = json.load(resp)
+    state is the dedupe source of truth). Retries transient read
+    failures (truncated responses seen through proxies)."""
+    last_err = None
+    for _attempt in range(3):
+        try:
+            req = urllib.request.Request(
+                worker_url.rstrip("/") + "/state",
+                headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                d = json.load(resp)
+            break
+        except (urllib.error.URLError, http.client.IncompleteRead,
+                ConnectionError, TimeoutError) as e:
+            last_err = e
+            log(f"Worker /state read failed ({e}); retrying...")
+            time.sleep(2)
+    else:
+        raise RuntimeError(f"Worker /state read failed: {last_err}")
     keys = set()
     for p in (d.get("inStock") or []) + (d.get("pending") or []):
         k = p.get("key") or normalize_batch(p.get("palletId"))
