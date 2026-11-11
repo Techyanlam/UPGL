@@ -192,6 +192,16 @@ def read_rows(token, app_token, table_id, max_pages):
                 f0 = items[0].get("fields") or {}
                 log(f"Sample row field keys: {sorted(f0.keys())}")
                 log(f"Sample row Batch# raw: {f0.get(F_BATCH)!r}")
+                # DIAGNOSTIC (2026-11-12 01:41): dry run #5 on the
+                # fixed commit still read Batch# as None on every
+                # row. Log the whole first-row fields dict plus how
+                # many of its values are non-null, to tell a
+                # Batch#-only quirk apart from all-values-null
+                # (app cannot read cell values in this Base).
+                nonnull = sum(1 for v in f0.values() if v is not None)
+                log(f"Sample row non-null field values: "
+                    f"{nonnull}/{len(f0)}")
+                log(f"Sample row fields (full): {f0!r}"[:1200])
         new_this_page = 0
         dupes = 0
         for item in items:
@@ -220,6 +230,21 @@ def read_rows(token, app_token, table_id, max_pages):
     if pages >= max_pages:
         log(f"WARNING: hit MAX_PAGES={max_pages} — older rows were not "
             f"scanned. Raise SYNC_MAX_PAGES if the table keeps growing.")
+    # DIAGNOSTIC (2026-11-12 01:41): how many rows carry a non-null
+    # Batch# / Business Unit at all, and what a non-null Batch#
+    # value looks like (string vs rich-text list).
+    n_batch = sum(1 for r in rows
+                  if (r.get("fields") or {}).get(F_BATCH) is not None)
+    n_bu = sum(1 for r in rows
+               if (r.get("fields") or {}).get(F_BU) is not None)
+    log(f"Rows with non-null Batch#: {n_batch}/{len(rows)}; "
+        f"non-null Business Unit: {n_bu}/{len(rows)}")
+    for r in rows:
+        v = (r.get("fields") or {}).get(F_BATCH)
+        if v is not None:
+            log(f"Example non-null Batch# value: {v!r} "
+                f"(record {r.get('record_id')})")
+            break
     return rows
 
 
