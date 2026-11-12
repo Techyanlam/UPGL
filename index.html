@@ -108,6 +108,30 @@
 
 
       <div class="card">
+        <h2>Excel 版面</h2>
+        <div class="toolbar">
+          <select id="liveExcelFilter">
+            <option value="all">全部</option>
+            <option value="in">在倉</option>
+            <option value="out">已出倉</option>
+          </select>
+          <input id="liveExcelSearch" type="text" placeholder="搜尋 Batch#…" autocomplete="off">
+          <button id="liveCsvBtn" class="btn" type="button">匯出 CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Daily Measurement Date</th><th>Timestamp（位置）</th><th>Dock Receipt Date</th>
+              <th>Business Unit</th><th>Reference</th><th>Batch#</th><th>Date of Measurement</th>
+              <th>Length</th><th>Width</th><th>Height</th><th>Volume</th><th>Ship Date</th><th>Remark</th>
+            </tr></thead>
+            <tbody id="liveExcelBody"></tbody>
+          </table>
+        </div>
+        <div class="totals" id="liveExcelTotals"></div>
+      </div>
+
+      <div class="card">
         <h2>已出倉清單</h2>
         <div class="table-wrap">
           <table>
@@ -155,6 +179,6 @@
 </main>
 <footer>UPG Pallet 倉存管理 · 前端 → Cloudflare Worker → KV · Lark 新貨直接同步（即時）· 每晚 20:00 自動寫返 Lark Pallet record</footer>
 <script src="config.js"></script>
-<script src="app.js?v=20261112-6"></script>
+<script src="app.js?v=20261112-7"></script>
 </body>
 </html>

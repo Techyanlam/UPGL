@@ -479,6 +479,92 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  /* ---------- 每日更新 · Excel 版面（即時倉存） ---------- */
+  // 同每日記錄一樣嘅 13 欄 Excel 格式，但讀 Worker 嘅即時倉存
+  //（在倉＋已出倉），唔使等每日記錄嗰個快照。
+  function liveExcelRows() {
+    var filter = $('liveExcelFilter').value;
+    var q = $('liveExcelSearch').value.trim();
+    var rows = [];
+    (state.inStock || []).forEach(function (b) {
+      rows.push({ b: b, inStock: true });
+    });
+    (state.departed || []).forEach(function (b) {
+      rows.push({ b: b, inStock: false });
+    });
+    if (filter === 'in') rows = rows.filter(function (r) { return r.inStock; });
+    if (filter === 'out') rows = rows.filter(function (r) { return !r.inStock; });
+    if (q) {
+      var nq = norm(q);
+      rows = rows.filter(function (r) { return norm(r.b.palletId).indexOf(nq) !== -1; });
+    }
+    rows.sort(function (a, b) {
+      return String(a.b.palletId).localeCompare(String(b.b.palletId));
+    });
+    return rows;
+  }
+
+  function liveExcelCells(r) {
+    var b = r.b;
+    var vol = (b.volumeCbm !== undefined && b.volumeCbm !== null && b.volumeCbm !== '')
+      ? Number(b.volumeCbm) : calcVolume(b.lengthCm, b.widthCm, b.heightCm);
+    return {
+      vol: vol,
+      cells: [
+        b.addedDate || b.dockReceiptDate || '',   // Daily Measurement Date
+        b.location || '',                          // Timestamp（位置）
+        b.dockReceiptDate || '',                   // Dock Receipt Date
+        b.businessUnit || '',                      // Business Unit
+        b.reference || '',                         // Reference
+        b.palletId || '',                          // Batch#
+        b.addedDate || b.dockReceiptDate || '',   // Date of Measurement
+        b.lengthCm || '', b.widthCm || '', b.heightCm || '',
+        fmtVolume(vol),
+        r.inStock ? '' : (b.departedDate || ''),   // Ship Date
+        r.inStock ? '' : '最後'                    // Remark
+      ]
+    };
+  }
+
+  function renderLiveExcel() {
+    var body = $('liveExcelBody');
+    body.innerHTML = '';
+    var rows = liveExcelRows();
+    var totalVol = 0;
+    rows.forEach(function (r) {
+      var res = liveExcelCells(r);
+      totalVol += res.vol || 0;
+      var tr = document.createElement('tr');
+      res.cells.forEach(function (c) {
+        var td = document.createElement('td');
+        td.textContent = c;
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    if (!rows.length) body.innerHTML = '<tr><td colspan="13">暫無資料。</td></tr>';
+    $('liveExcelTotals').textContent = '總板數：' + rows.length + '　總體積：' + fmtVolume(totalVol) + ' CBM';
+  }
+
+  function exportLiveCsv() {
+    var rows = liveExcelRows();
+    var header = ['Daily Measurement Date', 'Timestamp', 'Dock Receipt Date', 'Business Unit', 'Reference',
+      'Batch#', 'Date of Measurement', 'Length', 'Width', 'Height', 'Volume', 'Ship Date', 'Remark'];
+    var lines = [header.join(',')];
+    rows.forEach(function (r) {
+      var res = liveExcelCells(r);
+      lines.push(res.cells.map(csvCell).join(','));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'UPGL-在倉-' + todayStr() + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
   function renderAll() {
     renderStats();
     renderPending();
@@ -486,6 +572,7 @@
     renderDeparted();
     renderActivity();
     renderExcel();
+    renderLiveExcel();
   }
 
   /* ---------- 事件綁定 ---------- */
@@ -537,6 +624,9 @@
   $('excelSearch').addEventListener('input', renderExcel);
   $('excelDate').addEventListener('change', renderExcel);
   $('csvBtn').addEventListener('click', exportCsv);
+  $('liveExcelFilter').addEventListener('change', renderLiveExcel);
+  $('liveExcelSearch').addEventListener('input', renderLiveExcel);
+  $('liveCsvBtn').addEventListener('click', exportLiveCsv);
 
   $('addBtn').addEventListener('click', function () {
     hideError();
