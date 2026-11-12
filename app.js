@@ -511,16 +511,20 @@
     var b = r.b;
     var vol = (b.volumeCbm !== undefined && b.volumeCbm !== null && b.volumeCbm !== '')
       ? Number(b.volumeCbm) : calcVolume(b.lengthCm, b.widthCm, b.heightCm);
+    // 在倉嘅板今日量度，Daily Measurement Date / Date of
+    // Measurement 顯示今日；已出倉嘅板用返佢入倉嗰日。
+    var measureDate = r.inStock ? todayStr()
+      : (b.addedDate || b.dockReceiptDate || '');
     return {
       vol: vol,
       cells: [
-        b.addedDate || b.dockReceiptDate || '',   // Daily Measurement Date
+        measureDate,                              // Daily Measurement Date
         b.location || '',                          // Timestamp（位置）
         b.dockReceiptDate || '',                   // Dock Receipt Date
         b.businessUnit || '',                      // Business Unit
         b.reference || '',                         // Reference
         b.palletId || '',                          // Batch#
-        b.addedDate || b.dockReceiptDate || '',   // Date of Measurement
+        measureDate,                              // Date of Measurement
         b.lengthCm || '', b.widthCm || '', b.heightCm || '',
         fmtVolume(vol),
         r.inStock ? '' : (b.departedDate || ''),   // Ship Date
