@@ -199,6 +199,8 @@
       okBtn.type = 'button';
       okBtn.textContent = '確認加入';
       okBtn.addEventListener('click', function () {
+        if (!b.location || !String(b.location).trim()) { showError('請先設定位置。'); return; }
+        hideError();
         withBusy(okBtn, function () {
           return apiPost({ action: 'confirm', palletId: b.palletId, date: todayStr() });
         });
