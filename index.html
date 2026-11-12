@@ -96,10 +96,18 @@
 
       <div class="card">
         <h2>在倉表</h2>
-        <input id="stockSearch" type="text" placeholder="搜尋 Batch# 或位置…" autocomplete="off">
+        <div class="toolbar">
+          <input id="stockSearch" type="text" placeholder="搜尋 Batch# 或位置…" autocomplete="off">
+          <button id="stockCsvBtn" class="btn" type="button">匯出 CSV</button>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Batch#</th><th>位置</th><th>收貨日期</th><th>BU</th><th>尺寸 (cm)</th><th>體積 (CBM)</th><th>改高度 / 位置更新</th></tr></thead>
+            <thead><tr>
+              <th>Daily Measurement Date</th><th>Timestamp（位置）</th><th>Dock Receipt Date</th>
+              <th>Business Unit</th><th>Reference</th><th>Batch#</th><th>Date of Measurement</th>
+              <th>Length</th><th>Width</th><th>Height</th><th>Volume</th><th>Ship Date</th><th>Remark</th>
+              <th>改高度 / 位置更新</th>
+            </tr></thead>
             <tbody id="stockBody"></tbody>
           </table>
         </div>
@@ -133,9 +141,17 @@
 
       <div class="card">
         <h2>已出倉清單</h2>
+        <div class="toolbar">
+          <button id="departedCsvBtn" class="btn" type="button">匯出 CSV</button>
+        </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Batch#</th><th>位置</th><th>收貨日期</th><th>出倉日期</th><th>體積 (CBM)</th><th></th></tr></thead>
+            <thead><tr>
+              <th>Daily Measurement Date</th><th>Timestamp（位置）</th><th>Dock Receipt Date</th>
+              <th>Business Unit</th><th>Reference</th><th>Batch#</th><th>Date of Measurement</th>
+              <th>Length</th><th>Width</th><th>Height</th><th>Volume</th><th>Ship Date</th><th>Remark</th>
+              <th></th>
+            </tr></thead>
             <tbody id="departedBody"></tbody>
           </table>
         </div>
@@ -179,6 +195,6 @@
 </main>
 <footer>UPG Pallet 倉存管理 · 前端 → Cloudflare Worker → KV · Lark 新貨直接同步（即時）· 每晚 20:00 自動寫返 Lark Pallet record</footer>
 <script src="config.js"></script>
-<script src="app.js?v=20261112-7"></script>
+<script src="app.js?v=20261112-8"></script>
 </body>
 </html>

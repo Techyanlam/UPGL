@@ -267,16 +267,17 @@
     body.innerHTML = '';
     var rows = state.inStock.filter(function (b) { return matches(b, q); });
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="7">暫無在倉板。</td></tr>';
+      body.innerHTML = '<tr><td colspan="14">暫無在倉板。</td></tr>';
       return;
     }
     rows.forEach(function (b) {
       var tr = document.createElement('tr');
-      var vol = (b.volumeCbm !== undefined && b.volumeCbm !== null && b.volumeCbm !== '')
-        ? Number(b.volumeCbm) : calcVolume(b.lengthCm, b.widthCm, b.heightCm);
-      tr.innerHTML = '<td>' + esc(b.palletId) + '</td><td>' + esc(b.location) + '</td><td>' + esc(b.dockReceiptDate) +
-        '</td><td>' + esc(b.businessUnit) + '</td><td>' + esc(b.lengthCm) + '×' + esc(b.widthCm) + '×' + esc(b.heightCm) +
-        '</td><td>' + fmtVolume(vol) + '</td>';
+      // 同每日記錄一樣嘅 13 欄 Excel 格式（在倉：Ship Date / Remark 留空）
+      liveExcelCells({ b: b, inStock: true }).cells.forEach(function (c) {
+        var td0 = document.createElement('td');
+        td0.textContent = c;
+        tr.appendChild(td0);
+      });
       var td = document.createElement('td');
       var input = document.createElement('input');
       input.type = 'number'; input.min = '1'; input.step = '1';
@@ -316,15 +317,17 @@
     var body = $('departedBody');
     body.innerHTML = '';
     if (!state.departed.length) {
-      body.innerHTML = '<tr><td colspan="6">暫無已出倉板。</td></tr>';
+      body.innerHTML = '<tr><td colspan="14">暫無已出倉板。</td></tr>';
       return;
     }
     state.departed.forEach(function (b) {
       var tr = document.createElement('tr');
-      var vol = (b.volumeCbm !== undefined && b.volumeCbm !== null && b.volumeCbm !== '')
-        ? Number(b.volumeCbm) : calcVolume(b.lengthCm, b.widthCm, b.heightCm);
-      tr.innerHTML = '<td>' + esc(b.palletId) + '</td><td>' + esc(b.location) + '</td><td>' + esc(b.dockReceiptDate) +
-        '</td><td>' + esc(b.departedDate) + '</td><td>' + fmtVolume(vol) + '</td>';
+      // 同每日記錄一樣嘅 13 欄 Excel 格式（已出倉：Ship Date + Remark「最後」）
+      liveExcelCells({ b: b, inStock: false }).cells.forEach(function (c) {
+        var td0 = document.createElement('td');
+        td0.textContent = c;
+        tr.appendChild(td0);
+      });
       var td = document.createElement('td');
       var btn = document.createElement('button');
       btn.className = 'btn small secondary'; btn.type = 'button'; btn.textContent = '還原';
@@ -565,6 +568,34 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
+  function downloadCsv(pallets, inStock, filename) {
+    var header = ['Daily Measurement Date', 'Timestamp', 'Dock Receipt Date', 'Business Unit', 'Reference',
+      'Batch#', 'Date of Measurement', 'Length', 'Width', 'Height', 'Volume', 'Ship Date', 'Remark'];
+    var lines = [header.join(',')];
+    pallets.forEach(function (b) {
+      var res = liveExcelCells({ b: b, inStock: inStock });
+      lines.push(res.cells.map(csvCell).join(','));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function exportStockCsv() {
+    var q = $('stockSearch').value.trim();
+    var rows = state.inStock.filter(function (b) { return matches(b, q); });
+    downloadCsv(rows, true, 'UPGL-在倉-' + todayStr() + '.csv');
+  }
+
+  function exportDepartedCsv() {
+    downloadCsv(state.departed || [], false, 'UPGL-已出倉-' + todayStr() + '.csv');
+  }
+
   function renderAll() {
     renderStats();
     renderPending();
@@ -627,6 +658,8 @@
   $('liveExcelFilter').addEventListener('change', renderLiveExcel);
   $('liveExcelSearch').addEventListener('input', renderLiveExcel);
   $('liveCsvBtn').addEventListener('click', exportLiveCsv);
+  $('stockCsvBtn').addEventListener('click', exportStockCsv);
+  $('departedCsvBtn').addEventListener('click', exportDepartedCsv);
 
   $('addBtn').addEventListener('click', function () {
     hideError();
