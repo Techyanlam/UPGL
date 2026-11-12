@@ -15,8 +15,12 @@ Two-step sync (Yan, 2026-11-11 20:17):
 
 Rules (same as the Muse site):
   - Batch# is normalized (strip spaces, uppercase) for dedupe; the
-    Worker's state (in-stock + pending) is the source of truth —
-    already-present pallets are skipped, never duplicated.
+    Worker's state (in-stock + pending + departed + rejected) is the
+    source of truth — already-present pallets are skipped, never
+    duplicated. (Departed + rejected were added 2026-11-12: without
+    them, a confirmed-then-departed or rejected pallet would be
+    re-added to pending on the next sync, because its Dock Receipt
+    row is still in the Base and inside the +/-14d window.)
   - Volume is recomputed by the Worker from L x W x H (ROUNDUP to
     1 dp); the Base's Volume column is never copied (it has wrong
     values like 72 / 86).
@@ -292,9 +296,14 @@ def read_rows(token, app_token, table_id, max_pages):
 
 
 def get_worker_keys(worker_url):
-    """Normalized Batch# keys already in stock or pending (the Worker's
-    state is the dedupe source of truth). Retries transient read
-    failures (truncated responses seen through proxies)."""
+    """Normalized Batch# keys already in stock, pending, departed, or
+    rejected (the Worker's state is the dedupe source of truth).
+    Departed and rejected MUST be included: a pallet that was
+    confirmed then departed, or rejected from pending, still has its
+    Dock Receipt row in the Base inside the +/-14d window, so a sync
+    that only checks in-stock + pending would re-add it to pending
+    and silently undo the colleague's decision. Retries transient
+    read failures (truncated responses seen through proxies)."""
     last_err = None
     for _attempt in range(3):
         try:
@@ -312,12 +321,15 @@ def get_worker_keys(worker_url):
     else:
         raise RuntimeError(f"Worker /state read failed: {last_err}")
     keys = set()
-    for p in (d.get("inStock") or []) + (d.get("pending") or []):
+    for p in ((d.get("inStock") or []) + (d.get("pending") or []) +
+              (d.get("departed") or []) + (d.get("rejected") or [])):
         k = p.get("key") or normalize_batch(p.get("palletId"))
         if k:
             keys.add(k)
     log(f"Worker state: {d.get('inStockCount')} in stock, "
-        f"{len(d.get('pending') or [])} pending")
+        f"{len(d.get('pending') or [])} pending, "
+        f"{len(d.get('departed') or [])} departed, "
+        f"{len(d.get('rejected') or [])} rejected")
     return keys
 
 
@@ -364,7 +376,9 @@ def select_candidates(rows, worker_keys, today, days_back):
             skipped.append((batch_raw, f"bad Height {height!r}"))
             continue
         if norm in worker_keys:
-            skipped.append((batch_raw, "already in stock / pending"))
+            skipped.append((batch_raw,
+                            "already in stock / pending / departed / "
+                            "rejected"))
             continue
         length = to_number(plain_text(field_by_name(f, F_LENGTH)))
         width = to_number(plain_text(field_by_name(f, F_WIDTH)))
