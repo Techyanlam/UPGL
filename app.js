@@ -454,6 +454,12 @@
     body.style.display = open ? 'block' : 'none';
     $('departToggle').textContent = open ? '－' : '＋';
   });
+  $('addToggle').addEventListener('click', function () {
+    var body = $('addBody');
+    var open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    $('addToggle').textContent = open ? '－' : '＋';
+  });
   document.addEventListener('click', function (e) {
     if (!$('departSearch').contains(e.target) && !$('departDropdown').contains(e.target)) {
       $('departDropdown').style.display = 'none';

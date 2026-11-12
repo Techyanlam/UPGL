@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UPG Pallet 倉存管理</title>
-<link rel="stylesheet" href="styles.css?v=fe1f5a0">
+<link rel="stylesheet" href="styles.css?v=20261112-2">
 </head>
 <body>
 <header>
@@ -31,7 +31,11 @@
     <!-- 每日更新 -->
     <section id="pageDaily">
       <div class="card">
-        <h2>新板入倉</h2>
+        <div class="card-head">
+          <h2>新板入倉</h2>
+          <button id="addToggle" class="btn small toggle-btn" type="button" aria-label="展開或收起新板入倉">＋</button>
+        </div>
+        <div id="addBody" style="display:none">
         <div class="form-row">
           <div><label for="addPalletId">Batch# *</label><input id="addPalletId" type="text" placeholder="例如：UPG-20261111-P001"></div>
           <div><label for="addHeight">高度 (cm) *</label><input id="addHeight" type="number" min="1" step="1"></div>
@@ -54,6 +58,7 @@
         </div>
         <p style="font-size:13px;color:#4b5563">直接入倉，唔經待確認清單。</p>
         <button id="addBtn" class="btn" type="button">確認入倉</button>
+        </div>
       </div>
 
       <div class="card">
@@ -150,6 +155,6 @@
 </main>
 <footer>UPG Pallet 倉存管理 · 前端 → Cloudflare Worker → KV · Lark 新貨直接同步（即時）· 每晚 20:00 自動寫返 Lark Pallet record</footer>
 <script src="config.js"></script>
-<script src="app.js?v=fe1f5a0"></script>
+<script src="app.js?v=20261112-2"></script>
 </body>
 </html>
