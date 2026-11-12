@@ -44,7 +44,9 @@ renderExcel/exportCsv, including its quirks):
     addedDate — each night's snapshot is dated that night).
   - Timestamp column = the pallet's LOCATION (the website's export
     puts location in the Timestamp column; replicated here).
-  - Dock Receipt Date = dockReceiptDate.
+  - Dock Receipt Date = dockReceiptDate, as a "YYYY-MM-DD" STRING
+    (the Base column is Multiline text, not a Date field — epoch ms
+    is rejected with Lark error 1254060; fixed 2026-11-13).
   - Business Unit / Reference / Batch# (palletId as-is).
   - Date of Measurement = addedDate, falling back to
     dockReceiptDate.
@@ -403,7 +405,13 @@ def build_pallet_row(pallet, sync_date, ship_date=None):
     }
     dock = parse_date_ms(pallet.get("dockReceiptDate"))
     if dock:
-        fields[F_DOCK] = date_to_ms(dock)
+        # The Base's "Dock Receipt Date" column is a Multiline TEXT
+        # field (Lark inferred it from the mixed date strings in the
+        # imported Excel), not a Date field: it rejects epoch-ms
+        # numbers (error 1254060 TextFieldConvFail, 2026-11-13) and
+        # needs a "YYYY-MM-DD" string. parse_date_ms already
+        # normalises to that form.
+        fields[F_DOCK] = dock
     dom_src = pallet.get("addedDate") or pallet.get("dockReceiptDate")
     dom = parse_date_ms(dom_src)
     if dom:
