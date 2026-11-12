@@ -29,12 +29,11 @@ Rules (same as the record sync / backfill):
     it ('最後' when Ship Date is set).
   - Rows are sorted by (Daily Measurement Date, Batch#).
   - Cleaning on the way out (the table itself is NOT touched):
-    duplicate (date, Batch#) rows are dropped (the file's raw
-    DRAFT-PALLET and 20260827-trio duplicates — 4 per day), Batch#
-    is normalised (spaces stripped, missing P restored), and a
-    Ship Date stored as epoch ms is formatted as YYYY-MM-DD.
-    This is what makes the daily record show the TRUE snapshot
-    even when the table holds the raw file import.
+    Batch# is normalised (spaces stripped, missing P restored),
+    and a Ship Date stored as epoch ms is formatted as YYYY-MM-DD.
+    Rows are NOT deduplicated: the file lists DRAFT-PALLET and the
+    20260827 trio twice per day and Yan counts both copies
+    (11-11: 137 rows total, 133 in stock after the 4 departed).
 
 Output (daily-record.json, repo root):
   {"generatedAt": "<ISO UTC>", "rows": [ {dmd, location,
@@ -307,21 +306,11 @@ def main():
             skipped.append(why)
             continue
         out_rows.append(row)
-    deduped, dupes = {}, 0
-    for row in out_rows:
-        key = (row["dmd"], row["palletId"])
-        prev = deduped.get(key)
-        if prev is None:
-            deduped[key] = row
-            continue
-        dupes += 1
-        # Keep the earliest Date of Measurement (see the 20260827
-        # trio's 2028-08-27 typo vs the correct 2026-08-31 row).
-        if (row["dom"] or "9999") < (prev["dom"] or "9999"):
-            deduped[key] = row
-    out_rows = list(deduped.values())
+    # NO dedupe: Yan counts ROWS (the file's raw snapshot), not
+    # distinct Batch#s. DRAFT-PALLET and the 20260827 trio each
+    # appear twice per day in the file and are counted twice
+    # (11-11: 137 rows total, 133 in stock after the 4 departed).
     out_rows.sort(key=lambda r: (r["dmd"], r["palletId"]))
-    log(f"Deduplicated {dupes} duplicate (date, Batch#) rows")
     from collections import Counter
     per_day = Counter(r["dmd"] for r in out_rows)
     log(f"Exported rows: {len(out_rows)} "
@@ -341,7 +330,6 @@ def main():
     print(json.dumps({
         "rows": len(out_rows),
         "skipped": len(skipped),
-        "duplicates_removed": dupes,
         "per_day": dict(sorted(per_day.items())),
     }, indent=2, ensure_ascii=False))
     return 0
