@@ -1,0 +1,72 @@
+# ADD THIS FILE VIA THE GITHUB WEB EDITOR — The GitHub App cannot
+# push .github/workflows/*.yml files.
+# Copy this file to .github/workflows/lark-pallet-backfill-nov.yml in
+# the repo (web editor: repo -> Add file -> Create new file -> paste
+# -> Commit). One-off manual backfill: it reads
+# DOCK_RECEIPT_CYCLE_COUNT_11.xlsx (repo root) and writes the
+# November daily pallet snapshots (2026-11-01 .. 2026-11-11, plus
+# 11-07/11-08 carried forward from 11-06) into the Lark Base
+# "Pallet record" table (append-only: old rows are kept, one row per
+# pallet per day; a re-run appends nothing). 11-12 is NOT written
+# (already in Lark from the 2026-11-12 02:30 upload). The script
+# also writes departed rows (Ship Date = the file's ship date),
+# unlike the nightly record sync which is in-stock only.
+#
+# Repo secrets needed (repo -> Settings -> Secrets and variables ->
+# Actions -> New repository secret) — already set for the nightly
+# record sync, no new secrets:
+#   LARK_APP_ID       Lark self-built app id (e.g. "Yan Lam的智能助手")
+#   LARK_APP_SECRET   same app's secret
+#   LARK_APP_TOKEN    Base app_token: the string after base/ in the
+#                     "UPGL inbound and cycle count" Base URL
+#                     (QDo5bSOZraNgEhsRC7flOUMggPe)
+#   WORKER_URL is a plain value in this file (public Worker URL).
+# No WORKER_SYNC_SECRET is needed: this job only READS the Worker
+# state (GET /state, for the 11-11 #REF! height/location repair),
+# it never writes to the Worker.
+#
+# Run it FIRST with dry_run=true (default) and check the summary
+# (expect 1,474 rows over 11 days, 0 skipped), then run it again
+# with dry_run=false to write. The script fails loudly if the
+# file's days/counts differ from the verified November history.
+
+name: Lark pallet backfill Nov (Excel -> Pallet record)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (list what would be appended, do not write)"
+        type: boolean
+        default: true
+
+# Serialize runs: the backfill's Lark dedupe check reads the table
+# and then appends — two overlapping runs could both pass the check
+# and double-add the same rows. Never run two backfills in parallel
+# (and do not run it at the same time as the nightly record sync).
+concurrency:
+  group: lark-pallet-backfill-nov
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install openpyxl
+      - name: Backfill November snapshots to Pallet record
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+          WORKER_URL: https://upg-pallet-stock.yan-lam.workers.dev
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 lark_pallet_backfill_nov.py --dry-run
+          else
+            python3 lark_pallet_backfill_nov.py
+          fi
