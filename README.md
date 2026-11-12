@@ -13,8 +13,8 @@
   - 待確認新貨：Lark 同步嚟嘅新板先入待確認清單，同事逐項按「確認加入」先正式入倉，唔啱嘅按「唔加入」剔除（可選填原因）；確認／剔除都會記入活動記錄
   - 在倉表：搜尋 Batch#／位置，每行可改高度（體積按 ROUNDUP 到 1 位小數重計）
   - 新板入倉：直接入倉，唔經待確認
-  - 已出倉清單：可還原返在倉
-  - 活動記錄：出倉／改高度／入倉／還原／待確認／確認加入／唔加入
+  - 已出倉清單：可搜尋 Batch#／位置、按出倉日期篩選，可還原返在倉
+- **活動記錄**頁：出倉／改高度／入倉／還原／待確認／確認加入／唔加入
 - **Excel 版面**頁：欄位次序跟原檔（Daily Measurement Date、Timestamp、Dock Receipt Date、Business Unit、Reference、Batch#、Date of Measurement、Length、Width、Height、Volume、Ship Date、Remark）；可篩全部／在倉／已出倉＋搜尋 Batch#；底部有總板數同總體積；已出倉嘅板 Ship Date 顯示出倉日期、Remark 打「最後」，在倉留空
 - **CSV 匯出**：按當時篩選匯出目前顯示嘅表（UTF-8 BOM，Excel 開到），檔名 `UPGL-YYYY-MM-DD.csv`
 

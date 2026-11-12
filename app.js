@@ -321,6 +321,15 @@
   }
 
   /* ---------- 已出倉清單 ---------- */
+  function departedRows() {
+    var q = $('departedSearch').value.trim();
+    var ship = $('departedShipDate').value;
+    return (state.departed || []).filter(function (b) {
+      if (ship && (b.departedDate || '') !== ship) return false;
+      return matches(b, q);
+    });
+  }
+
   function renderDeparted() {
     var body = $('departedBody');
     body.innerHTML = '';
@@ -328,7 +337,12 @@
       body.innerHTML = '<tr><td colspan="14">暫無已出倉板。</td></tr>';
       return;
     }
-    state.departed.forEach(function (b) {
+    var rows = departedRows();
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="14">暫無符合篩選嘅已出倉板。</td></tr>';
+      return;
+    }
+    rows.forEach(function (b) {
       var tr = document.createElement('tr');
       // 還原掣放最左，唔使碌去最右
       var td = document.createElement('td');
@@ -543,7 +557,7 @@
   }
 
   function exportDepartedCsv() {
-    downloadCsv(state.departed || [], false, 'UPGL-已出倉-' + todayStr() + '.csv');
+    downloadCsv(departedRows(), false, 'UPGL-已出倉-' + todayStr() + '.csv');
   }
 
   function renderAll() {
@@ -557,13 +571,17 @@
 
   /* ---------- 事件綁定 ---------- */
   $('tabDaily').addEventListener('click', function () {
-    $('tabDaily').classList.add('active'); $('tabExcel').classList.remove('active');
-    $('pageDaily').style.display = 'block'; $('pageExcel').style.display = 'none';
+    $('tabDaily').classList.add('active'); $('tabExcel').classList.remove('active'); $('tabActivity').classList.remove('active');
+    $('pageDaily').style.display = 'block'; $('pageExcel').style.display = 'none'; $('pageActivity').style.display = 'none';
   });
   $('tabExcel').addEventListener('click', function () {
-    $('tabExcel').classList.add('active'); $('tabDaily').classList.remove('active');
-    $('pageExcel').style.display = 'block'; $('pageDaily').style.display = 'none';
+    $('tabExcel').classList.add('active'); $('tabDaily').classList.remove('active'); $('tabActivity').classList.remove('active');
+    $('pageExcel').style.display = 'block'; $('pageDaily').style.display = 'none'; $('pageActivity').style.display = 'none';
     renderExcel();
+  });
+  $('tabActivity').addEventListener('click', function () {
+    $('tabActivity').classList.add('active'); $('tabDaily').classList.remove('active'); $('tabExcel').classList.remove('active');
+    $('pageActivity').style.display = 'block'; $('pageDaily').style.display = 'none'; $('pageExcel').style.display = 'none';
   });
 
   $('departSearch').addEventListener('input', function () { renderDepartDropdown(); });
@@ -600,6 +618,8 @@
   });
 
   $('stockSearch').addEventListener('input', renderStock);
+  $('departedSearch').addEventListener('input', renderDeparted);
+  $('departedShipDate').addEventListener('change', renderDeparted);
   $('excelFilter').addEventListener('change', renderExcel);
   $('excelSearch').addEventListener('input', renderExcel);
   $('excelDate').addEventListener('change', renderExcel);

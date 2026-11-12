@@ -26,6 +26,7 @@
     <nav class="tabs">
       <button id="tabDaily" class="active" type="button">每日更新</button>
       <button id="tabExcel" type="button">每日記錄</button>
+      <button id="tabActivity" type="button">活動記錄</button>
     </nav>
 
     <!-- 每日更新 -->
@@ -119,6 +120,9 @@
       <div class="card">
         <h2>已出倉清單</h2>
         <div class="toolbar">
+          <input id="departedSearch" type="text" placeholder="搜尋 Batch# 或位置…" autocomplete="off">
+          <label for="departedShipDate">出倉日期</label>
+          <input id="departedShipDate" type="date">
           <button id="departedCsvBtn" class="btn" type="button">匯出 CSV</button>
         </div>
         <div class="table-wrap">
@@ -134,6 +138,10 @@
         </div>
       </div>
 
+    </section>
+
+    <!-- 活動記錄 -->
+    <section id="pageActivity" style="display:none">
       <div class="card">
         <h2>活動記錄</h2>
         <ul id="activityList" class="activity"></ul>
@@ -172,6 +180,6 @@
 </main>
 <footer>UPG Pallet 倉存管理 · 前端 → Cloudflare Worker → KV · Lark 新貨直接同步（即時）· 每晚 20:00 自動寫返 Lark Pallet record</footer>
 <script src="config.js"></script>
-<script src="app.js?v=20261112-10"></script>
+<script src="app.js?v=20261112-11"></script>
 </body>
 </html>
