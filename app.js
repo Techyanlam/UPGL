@@ -181,6 +181,19 @@
       var reason = document.createElement('input');
       reason.type = 'text';
       reason.placeholder = '唔加入原因（可選填）';
+      var locInput = document.createElement('input');
+      locInput.type = 'text';
+      locInput.placeholder = '新位置'; locInput.style.width = '110px';
+      var locBtn = document.createElement('button');
+      locBtn.className = 'btn small'; locBtn.type = 'button'; locBtn.textContent = '改位置';
+      locBtn.addEventListener('click', function () {
+        var loc = locInput.value.trim();
+        if (!loc) { showError('請輸入新位置。'); return; }
+        hideError();
+        withBusy(locBtn, function () {
+          return apiPost({ action: 'updateLocation', palletId: b.palletId, newLocation: loc, date: todayStr() });
+        });
+      });
       var okBtn = document.createElement('button');
       okBtn.className = 'btn small';
       okBtn.type = 'button';
@@ -202,6 +215,8 @@
         });
       });
       actions.appendChild(reason);
+      actions.appendChild(locInput);
+      actions.appendChild(locBtn);
       actions.appendChild(okBtn);
       actions.appendChild(noBtn);
       item.appendChild(title);
