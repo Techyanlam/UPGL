@@ -272,13 +272,9 @@
     }
     rows.forEach(function (b) {
       var tr = document.createElement('tr');
-      // 同每日記錄一樣嘅 13 欄 Excel 格式（在倉：Ship Date / Remark 留空）
-      liveExcelCells({ b: b, inStock: true }).cells.forEach(function (c) {
-        var td0 = document.createElement('td');
-        td0.textContent = c;
-        tr.appendChild(td0);
-      });
+      // 操作欄放最左：唔使碌去最右先見到改高度 / 位置更新
       var td = document.createElement('td');
+      td.className = 'ops';
       var input = document.createElement('input');
       input.type = 'number'; input.min = '1'; input.step = '1';
       input.placeholder = '新高度 cm'; input.style.width = '110px';
@@ -292,7 +288,10 @@
           return apiPost({ action: 'updateHeight', palletId: b.palletId, heightCm: h, date: todayStr() });
         });
       });
-      td.appendChild(input); td.appendChild(btn);
+      var rowH = document.createElement('div');
+      rowH.className = 'op-row';
+      rowH.appendChild(input); rowH.appendChild(btn);
+      td.appendChild(rowH);
       var locInput = document.createElement('input');
       locInput.type = 'text';
       locInput.placeholder = '新位置'; locInput.style.width = '110px';
@@ -306,8 +305,17 @@
           return apiPost({ action: 'updateLocation', palletId: b.palletId, newLocation: loc, date: todayStr() });
         });
       });
-      td.appendChild(locInput); td.appendChild(locBtn);
+      var rowL = document.createElement('div');
+      rowL.className = 'op-row';
+      rowL.appendChild(locInput); rowL.appendChild(locBtn);
+      td.appendChild(rowL);
       tr.appendChild(td);
+      // 其後係同每日記錄一樣嘅 13 欄 Excel 格式（在倉：Ship Date / Remark 留空）
+      liveExcelCells({ b: b, inStock: true }).cells.forEach(function (c) {
+        var td0 = document.createElement('td');
+        td0.textContent = c;
+        tr.appendChild(td0);
+      });
       body.appendChild(tr);
     });
   }
@@ -322,13 +330,9 @@
     }
     state.departed.forEach(function (b) {
       var tr = document.createElement('tr');
-      // 同每日記錄一樣嘅 13 欄 Excel 格式（已出倉：Ship Date + Remark「最後」）
-      liveExcelCells({ b: b, inStock: false }).cells.forEach(function (c) {
-        var td0 = document.createElement('td');
-        td0.textContent = c;
-        tr.appendChild(td0);
-      });
+      // 還原掣放最左，唔使碌去最右
       var td = document.createElement('td');
+      td.className = 'ops';
       var btn = document.createElement('button');
       btn.className = 'btn small secondary'; btn.type = 'button'; btn.textContent = '還原';
       btn.addEventListener('click', function () {
@@ -338,6 +342,12 @@
       });
       td.appendChild(btn);
       tr.appendChild(td);
+      // 其後係同每日記錄一樣嘅 13 欄 Excel 格式（已出倉：Ship Date + Remark「最後」）
+      liveExcelCells({ b: b, inStock: false }).cells.forEach(function (c) {
+        var td0 = document.createElement('td');
+        td0.textContent = c;
+        tr.appendChild(td0);
+      });
       body.appendChild(tr);
     });
   }
@@ -482,31 +492,6 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  /* ---------- 每日更新 · Excel 版面（即時倉存） ---------- */
-  // 同每日記錄一樣嘅 13 欄 Excel 格式，但讀 Worker 嘅即時倉存
-  //（在倉＋已出倉），唔使等每日記錄嗰個快照。
-  function liveExcelRows() {
-    var filter = $('liveExcelFilter').value;
-    var q = $('liveExcelSearch').value.trim();
-    var rows = [];
-    (state.inStock || []).forEach(function (b) {
-      rows.push({ b: b, inStock: true });
-    });
-    (state.departed || []).forEach(function (b) {
-      rows.push({ b: b, inStock: false });
-    });
-    if (filter === 'in') rows = rows.filter(function (r) { return r.inStock; });
-    if (filter === 'out') rows = rows.filter(function (r) { return !r.inStock; });
-    if (q) {
-      var nq = norm(q);
-      rows = rows.filter(function (r) { return norm(r.b.palletId).indexOf(nq) !== -1; });
-    }
-    rows.sort(function (a, b) {
-      return String(a.b.palletId).localeCompare(String(b.b.palletId));
-    });
-    return rows;
-  }
-
   function liveExcelCells(r) {
     var b = r.b;
     var vol = (b.volumeCbm !== undefined && b.volumeCbm !== null && b.volumeCbm !== '')
@@ -531,45 +516,6 @@
         r.inStock ? '' : '最後'                    // Remark
       ]
     };
-  }
-
-  function renderLiveExcel() {
-    var body = $('liveExcelBody');
-    body.innerHTML = '';
-    var rows = liveExcelRows();
-    var totalVol = 0;
-    rows.forEach(function (r) {
-      var res = liveExcelCells(r);
-      totalVol += res.vol || 0;
-      var tr = document.createElement('tr');
-      res.cells.forEach(function (c) {
-        var td = document.createElement('td');
-        td.textContent = c;
-        tr.appendChild(td);
-      });
-      body.appendChild(tr);
-    });
-    if (!rows.length) body.innerHTML = '<tr><td colspan="13">暫無資料。</td></tr>';
-    $('liveExcelTotals').textContent = '總板數：' + rows.length + '　總體積：' + fmtVolume(totalVol) + ' CBM';
-  }
-
-  function exportLiveCsv() {
-    var rows = liveExcelRows();
-    var header = ['Daily Measurement Date', 'Timestamp', 'Dock Receipt Date', 'Business Unit', 'Reference',
-      'Batch#', 'Date of Measurement', 'Length', 'Width', 'Height', 'Volume', 'Ship Date', 'Remark'];
-    var lines = [header.join(',')];
-    rows.forEach(function (r) {
-      var res = liveExcelCells(r);
-      lines.push(res.cells.map(csvCell).join(','));
-    });
-    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'UPGL-在倉-' + todayStr() + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
   function downloadCsv(pallets, inStock, filename) {
@@ -607,7 +553,6 @@
     renderDeparted();
     renderActivity();
     renderExcel();
-    renderLiveExcel();
   }
 
   /* ---------- 事件綁定 ---------- */
@@ -659,9 +604,6 @@
   $('excelSearch').addEventListener('input', renderExcel);
   $('excelDate').addEventListener('change', renderExcel);
   $('csvBtn').addEventListener('click', exportCsv);
-  $('liveExcelFilter').addEventListener('change', renderLiveExcel);
-  $('liveExcelSearch').addEventListener('input', renderLiveExcel);
-  $('liveCsvBtn').addEventListener('click', exportLiveCsv);
   $('stockCsvBtn').addEventListener('click', exportStockCsv);
   $('departedCsvBtn').addEventListener('click', exportDepartedCsv);
 

@@ -3,7 +3,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", "PingFang HK", "Micros
 header { background: #1e3a5f; color: #fff; padding: 16px; }
 header h1 { margin: 0 0 4px; font-size: 20px; }
 header p { margin: 0; font-size: 13px; opacity: .85; }
-main { max-width: 1080px; margin: 0 auto; padding: 16px; }
+main { max-width: 1400px; margin: 0 auto; padding: 16px; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
 .stat { background: #fff; border-radius: 8px; padding: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .stat .label { font-size: 13px; color: #6b7280; }
@@ -31,8 +31,8 @@ button { cursor: pointer; }
 .dropdown div:hover { background: #eff6ff; }
 .selected { background: #eff6ff; border: 1px solid #93c5fd; border-radius: 6px; padding: 10px; margin-top: 8px; font-size: 14px; }
 .table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { border-bottom: 1px solid #e5e7eb; padding: 8px 6px; text-align: left; white-space: nowrap; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid #e5e7eb; padding: 5px 6px; text-align: left; white-space: nowrap; }
 th { background: #f8fafc; color: #374151; }
 .pending-item { border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
 .pending-item .title { font-weight: 700; font-size: 15px; }
@@ -61,3 +61,8 @@ footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 16px; }
 .card-head h2 { margin: 0; }
 .toggle-btn { min-width: 34px; padding: 6px 10px; font-size: 16px; margin: 0; }
 .remark { font-size: 13px; color: #92400e; margin: 4px 0 0; }
+/* 操作欄放最左：高度 / 位置兩行上下排，唔好畀佢縮細 */
+td.ops { white-space: normal; min-width: 198px; }
+.op-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.op-row:last-child { margin-bottom: 0; }
+.op-row input { flex: none; }

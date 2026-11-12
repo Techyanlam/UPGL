@@ -4,23 +4,30 @@
 Direction is the REVERSE of lark_pallet_sync.py (which reads Dock
 Receipt and puts new pallets in the website's pending queue). This
 script copies the website's CURRENT in-stock table into the Base
-every night, plus the website's activity log.
+every night, plus one row per pallet departed that day (with Ship
+Date), plus the website's activity log.
 
 Destination tables in Base "UPGL inbound and cycle count"
 (app_token QDo5bSOZraNgEhsRC7flOUMggPe; table ids are in the Base
 URLs, so they are hardcoded here — they are not secrets):
   - "Pallet record" tblPGvy6n3bApbiN — one row per in-stock pallet
-    per night (append-only history; the same pallet appears once
-    per night, and the Daily Measurement Date differs between
-    nights). The 4 pre-existing BLANK rows are left alone; nothing
-    is ever deleted from this table.
+    per night, plus one row per pallet departed THAT night (with
+    Ship Date = the departure date, so the night's snapshot
+    matches the Excel convention: a departed pallet appears on
+    its departure day with Ship Date and Remark 「最後」, then
+    disappears). Append-only history; the same pallet appears
+    once per night, and the Daily Measurement Date differs
+    between nights. The 4 pre-existing BLANK rows are left
+    alone; nothing is ever deleted from this table.
   - "活動記錄" tbl3IEmUb8gRSM84 — one row per activity entry, text
     only. The 5 pre-existing BLANK rows are left alone; nothing
     is ever deleted from this table.
 
-Semantics (Yan, 2026-11-12 00:52):
+Semantics (Yan, 2026-11-12 00:52; departed rows added 2026-11-12):
   - Pallet record: keep old rows, add new ones. A run appends one
-    row per in-stock pallet for the sync-night date.
+    row per in-stock pallet for the sync-night date, plus one row
+    per pallet departed on the sync-night date (Ship Date =
+    departure date).
   - 活動記錄： append new entries line by line; never duplicate
     one already in the table.
 
@@ -44,7 +51,8 @@ renderExcel/exportCsv, including its quirks):
   - Length / Width / Height (cm); Volume is RECOMPUTED as
     ROUNDUP(L*W*H/1e6, 1 dp) — the Base's Volume column is never
     copied (it has wrong values like 72 / 86).
-  - Ship Date = blank (in-stock only).
+  - Ship Date = blank for in-stock rows; = the departure date
+    for rows of pallets departed on the sync-night date.
   - M-key column = Excel serial of the Daily Measurement Date
     (days since 1899-12-30; verified 2026-11-12 = 46338)
     concatenated with the Batch#, as text.
@@ -361,9 +369,11 @@ def batch_create(token, app_token, table_id, records, label):
     return total
 
 
-def build_pallet_row(pallet, sync_date):
-    """One Pallet record row for one in-stock pallet on the sync
-    night. Returns (fields dict, skip_reason or None)."""
+def build_pallet_row(pallet, sync_date, ship_date=None):
+    """One Pallet record row for one pallet on the sync night.
+    In-stock pallets get a blank Ship Date; a pallet departed on
+    the sync night gets Ship Date = its departure date.
+    Returns (fields dict, skip_reason or None)."""
     pallet_id = str(pallet.get("palletId") or "").strip()
     if not pallet_id:
         return None, "empty palletId"
@@ -398,8 +408,11 @@ def build_pallet_row(pallet, sync_date):
     dom = parse_date_ms(dom_src)
     if dom:
         fields[F_DOM] = date_to_ms(dom)
-    # Ship Date stays blank for in-stock pallets; empty-valued fields
-    # are omitted (Lark treats an omitted field as blank).
+    # Ship Date: blank for in-stock pallets, the departure date for
+    # pallets departed on the sync night. Empty-valued fields are
+    # omitted (Lark treats an omitted field as blank).
+    if ship_date:
+        fields[F_SHIP] = date_to_ms(ship_date)
     fields = {k: v for k, v in fields.items()
               if v != "" and v is not None}
     return fields, None
@@ -474,8 +487,33 @@ def main():
         to_append.append(fields)
     for batch, why in skipped_pallets:
         log(f"Pallet record skipped: {batch or '(no Batch#)'} — {why}")
+    # Pallets departed ON the sync night: one row each, with Ship
+    # Date = the departure date (Excel convention: a departed
+    # pallet appears on its departure day, then disappears).
+    # Anything departed on an earlier night already has its row
+    # from that night's run (or the backfill) and is not re-added.
+    departed = state.get("departed") or []
+    departed_today = 0
+    for pallet in departed:
+        dep_date = str(pallet.get("departedDate") or "").strip()
+        if dep_date != sync_date:
+            continue
+        pallet_id = str(pallet.get("palletId") or "").strip()
+        pair = (normalize_batch(pallet_id), sync_date)
+        if pair in existing_pairs:
+            skipped_pallets.append(
+                (pallet_id, f"already present for {sync_date}"))
+            continue
+        fields, why = build_pallet_row(pallet, sync_date,
+                                       ship_date=dep_date)
+        if fields is None:
+            skipped_pallets.append((pallet_id, why))
+            continue
+        to_append.append(fields)
+        departed_today += 1
     log(f"Pallet record rows to append: {len(to_append)} "
         f"({[f[F_BATCH] for f in to_append]})")
+    log(f"  of which departed on {sync_date}: {departed_today}")
 
     # --- 活動記錄: existing texts --------------------------------------
     activity_rows = list_records(token, app_token, ACTIVITY_TABLE_ID,
