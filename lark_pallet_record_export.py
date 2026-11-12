@@ -28,6 +28,13 @@ Rules (same as the record sync / backfill):
     day. Remark is NOT stored in the table; the website derives
     it ('最後' when Ship Date is set).
   - Rows are sorted by (Daily Measurement Date, Batch#).
+  - Cleaning on the way out (the table itself is NOT touched):
+    duplicate (date, Batch#) rows are dropped (the file's raw
+    DRAFT-PALLET and 20260827-trio duplicates — 4 per day), Batch#
+    is normalised (spaces stripped, missing P restored), and a
+    Ship Date stored as epoch ms is formatted as YYYY-MM-DD.
+    This is what makes the daily record show the TRUE snapshot
+    even when the table holds the raw file import.
 
 Output (daily-record.json, repo root):
   {"generatedAt": "<ISO UTC>", "rows": [ {dmd, location,
@@ -153,6 +160,34 @@ def parse_date_ms(raw):
     return None
 
 
+def norm_batch(batch):
+    """Canonical Batch#: no spaces, uppercase, and the missing P
+    restored for UPG-YYYYMMDD-NNN (the file's old space spelling
+    "UPG-20220525- 024" is the same pallet as "UPG-20220525-P024")."""
+    b = str(batch or "").strip().upper()
+    compact = re.sub(r"\s+", "", b)
+    m = re.match(r"^(UPG-\d{8}-)(P?)(\d{3})$", compact)
+    if m:
+        return m.group(1) + "P" + m.group(3)
+    return b
+
+
+def parse_ship_date(raw):
+    """Ship Date is a TEXT column, but a raw file import stores it
+    as epoch ms (a number) instead of 'YYYY-MM-DD'. Normalise both
+    to a YYYY-MM-DD string (HKT), or '' if blank."""
+    if raw is None:
+        return ""
+    if isinstance(raw, (int, float)):
+        return parse_date_ms(raw) or ""
+    s = str(raw).strip()
+    if not s:
+        return ""
+    if re.fullmatch(r"\d{10,13}", s):
+        return parse_date_ms(int(s)) or ""
+    return parse_date_ms(s) or s
+
+
 def to_number(raw, default=None):
     if isinstance(raw, (int, float)):
         return raw
@@ -213,7 +248,7 @@ def list_records(token, app_token, table_id, max_pages, label):
 def build_row(fields):
     """One daily-record row from one Pallet record row's fields.
     Returns (row dict, skip_reason or None)."""
-    batch = plain_text(field_by_name(fields, F_BATCH)).strip()
+    batch = norm_batch(plain_text(field_by_name(fields, F_BATCH)))
     if not batch:
         return None, "blank Batch#"
     dmd = parse_date_ms(field_by_name(fields, F_DMD)) or ""
@@ -239,7 +274,7 @@ def build_row(fields):
         "heightCm": height,
         "volumeCbm": calc_volume(length, width, height),
         "shipDate":
-            plain_text(field_by_name(fields, F_SHIP)).strip(),
+            parse_ship_date(field_by_name(fields, F_SHIP)),
         "mkey": mkey,
     }
     return row, None
@@ -272,7 +307,21 @@ def main():
             skipped.append(why)
             continue
         out_rows.append(row)
+    deduped, dupes = {}, 0
+    for row in out_rows:
+        key = (row["dmd"], row["palletId"])
+        prev = deduped.get(key)
+        if prev is None:
+            deduped[key] = row
+            continue
+        dupes += 1
+        # Keep the earliest Date of Measurement (see the 20260827
+        # trio's 2028-08-27 typo vs the correct 2026-08-31 row).
+        if (row["dom"] or "9999") < (prev["dom"] or "9999"):
+            deduped[key] = row
+    out_rows = list(deduped.values())
     out_rows.sort(key=lambda r: (r["dmd"], r["palletId"]))
+    log(f"Deduplicated {dupes} duplicate (date, Batch#) rows")
     from collections import Counter
     per_day = Counter(r["dmd"] for r in out_rows)
     log(f"Exported rows: {len(out_rows)} "
@@ -292,6 +341,7 @@ def main():
     print(json.dumps({
         "rows": len(out_rows),
         "skipped": len(skipped),
+        "duplicates_removed": dupes,
         "per_day": dict(sorted(per_day.items())),
     }, indent=2, ensure_ascii=False))
     return 0
