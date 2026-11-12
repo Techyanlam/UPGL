@@ -31,44 +31,6 @@
     <!-- 每日更新 -->
     <section id="pageDaily">
       <div class="card">
-        <h2>出倉登記</h2>
-        <label for="departSearch">板號（輸入任何一部分即可搜尋，只列在倉板）</label>
-        <div class="search-box">
-          <input id="departSearch" type="text" placeholder="例如：20261105、P001、2026-11-05" autocomplete="off">
-          <div id="departDropdown" class="dropdown" style="display:none"></div>
-        </div>
-        <div id="departSelected" class="selected" style="display:none"></div>
-        <div class="form-row">
-          <div>
-            <label for="departDate">出倉日期</label>
-            <input id="departDate" type="date">
-          </div>
-          <div>
-            <label for="departHeight">新高度 (cm)（如有改動先填，留空即沿用原高度）</label>
-            <input id="departHeight" type="number" min="1" step="1" placeholder="留空 = 不變">
-          </div>
-        </div>
-        <button id="departBtn" class="btn" type="button" disabled>確認出倉</button>
-      </div>
-
-      <div class="card">
-        <h2>待確認新貨（Lark 同步）</h2>
-        <p style="font-size:13px;color:#4b5563;margin-top:0">Lark 同步嚟嘅新板唔會即刻入倉，請逐項核對後按「確認加入」先正式入倉；唔啱嘅按「唔加入」剔除。</p>
-        <div id="pendingList"></div>
-      </div>
-
-      <div class="card">
-        <h2>在倉表</h2>
-        <input id="stockSearch" type="text" placeholder="搜尋 Batch# 或位置…" autocomplete="off">
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Batch#</th><th>位置</th><th>收貨日期</th><th>BU</th><th>尺寸 (cm)</th><th>體積 (CBM)</th><th>改高度 / 改位置</th></tr></thead>
-            <tbody id="stockBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
         <h2>新板入倉</h2>
         <div class="form-row">
           <div><label for="addPalletId">Batch# *</label><input id="addPalletId" type="text" placeholder="例如：UPG-20261111-P001"></div>
@@ -93,6 +55,52 @@
         <p style="font-size:13px;color:#4b5563">直接入倉，唔經待確認清單。</p>
         <button id="addBtn" class="btn" type="button">確認入倉</button>
       </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>出倉登記</h2>
+          <button id="departToggle" class="btn small toggle-btn" type="button" aria-label="展開或收起出倉登記">＋</button>
+        </div>
+        <div id="departBody" style="display:none">
+        <label for="departSearch">板號（輸入任何一部分即可搜尋，只列在倉板）</label>
+        <div class="search-box">
+          <input id="departSearch" type="text" placeholder="例如：20261105、P001、2026-11-05" autocomplete="off">
+          <div id="departDropdown" class="dropdown" style="display:none"></div>
+        </div>
+        <div id="departSelected" class="selected" style="display:none"></div>
+        <div class="form-row">
+          <div>
+            <label for="departDate">出倉日期</label>
+            <input id="departDate" type="date">
+          </div>
+          <div>
+            <label for="departHeight">新高度 (cm)（如有改動先填，留空即沿用原高度）</label>
+            <input id="departHeight" type="number" min="1" step="1" placeholder="留空 = 不變">
+          </div>
+        </div>
+        <button id="departBtn" class="btn" type="button" disabled>確認出倉</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>待確認新貨（Lark 同步）</h2>
+        <p style="font-size:13px;color:#4b5563;margin-top:0">Lark 同步嚟嘅新板唔會即刻入倉，請逐項核對後按「確認加入」先正式入倉；唔啱嘅按「唔加入」剔除。</p>
+        <p class="remark">REMARK：請先更新位置，更新後先可以確認加入。</p>
+        <div id="pendingList"></div>
+      </div>
+
+      <div class="card">
+        <h2>在倉表</h2>
+        <input id="stockSearch" type="text" placeholder="搜尋 Batch# 或位置…" autocomplete="off">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Batch#</th><th>位置</th><th>收貨日期</th><th>BU</th><th>尺寸 (cm)</th><th>體積 (CBM)</th><th>改高度 / 位置更新</th></tr></thead>
+            <tbody id="stockBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+
 
       <div class="card">
         <h2>已出倉清單</h2>

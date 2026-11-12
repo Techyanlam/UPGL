@@ -185,7 +185,7 @@
       locInput.type = 'text';
       locInput.placeholder = '新位置'; locInput.style.width = '110px';
       var locBtn = document.createElement('button');
-      locBtn.className = 'btn small'; locBtn.type = 'button'; locBtn.textContent = '改位置';
+      locBtn.className = 'btn small'; locBtn.type = 'button'; locBtn.textContent = '位置更新';
       locBtn.addEventListener('click', function () {
         var loc = locInput.value.trim();
         if (!loc) { showError('請輸入新位置。'); return; }
@@ -198,6 +198,7 @@
       okBtn.className = 'btn small';
       okBtn.type = 'button';
       okBtn.textContent = '確認加入';
+      okBtn.disabled = !b.location || !String(b.location).trim();
       okBtn.addEventListener('click', function () {
         if (!b.location || !String(b.location).trim()) { showError('請先設定位置。'); return; }
         hideError();
@@ -264,7 +265,7 @@
       locInput.type = 'text';
       locInput.placeholder = '新位置'; locInput.style.width = '110px';
       var locBtn = document.createElement('button');
-      locBtn.className = 'btn small'; locBtn.type = 'button'; locBtn.textContent = '改位置';
+      locBtn.className = 'btn small'; locBtn.type = 'button'; locBtn.textContent = '位置更新';
       locBtn.addEventListener('click', function () {
         var loc = locInput.value.trim();
         if (!loc) { showError('請輸入新位置。'); return; }
@@ -309,7 +310,7 @@
 
   /* ---------- 活動記錄 ---------- */
   var ACT_LABEL = {
-    depart: '出倉', updateHeight: '改高度', updateLocation: '改位置', add: '入倉', restore: '還原',
+    depart: '出倉', updateHeight: '改高度', updateLocation: '位置更新', add: '入倉', restore: '還原',
     pending: '待確認', confirm: '確認加入', reject: '唔加入'
   };
   function renderActivity() {
@@ -447,6 +448,12 @@
   });
 
   $('departSearch').addEventListener('input', function () { renderDepartDropdown(); });
+  $('departToggle').addEventListener('click', function () {
+    var body = $('departBody');
+    var open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    $('departToggle').textContent = open ? '－' : '＋';
+  });
   document.addEventListener('click', function (e) {
     if (!$('departSearch').contains(e.target) && !$('departDropdown').contains(e.target)) {
       $('departDropdown').style.display = 'none';
