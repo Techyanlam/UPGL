@@ -380,10 +380,12 @@
         heightCm: r.heightCm, volumeCbm: r.volumeCbm,
         addedDate: r.dmd, departedDate: r.shipDate || ''
       };
-      rows.push({ b: b, inStock: !r.shipDate });
+      // 每日記錄係當日量度快照：有 Ship Date 嘅板，當日量度嗰陣
+      // 仲喺倉（出倉係量度之後嘅事），所以嗰日都計在倉；shipped
+      // 只係標記佢嗰日出咗倉，唔會喺之後嗰日出現。
+      rows.push({ b: b, inStock: true, shipped: !!r.shipDate });
     });
-    if (filter === 'in') rows = rows.filter(function (r) { return r.inStock; });
-    if (filter === 'out') rows = rows.filter(function (r) { return !r.inStock; });
+    if (filter === 'out') rows = rows.filter(function (r) { return r.shipped; });
     if (q) {
       var nq = norm(q);
       rows = rows.filter(function (r) { return norm(r.b.palletId).indexOf(nq) !== -1; });
@@ -428,8 +430,8 @@
         b.addedDate || b.dockReceiptDate || '',   // Date of Measurement
         b.lengthCm || '', b.widthCm || '', b.heightCm || '',
         fmtVolume(vol),
-        r.inStock ? '' : (b.departedDate || ''),   // Ship Date
-        r.inStock ? '' : '最後'                    // Remark
+        r.shipped ? (b.departedDate || '') : '',   // Ship Date（嗰日出倉）
+        r.shipped ? '最後' : ''                    // Remark
       ];
       cells.forEach(function (c) {
         var td = document.createElement('td');
@@ -455,7 +457,7 @@
         b.addedDate || b.dockReceiptDate || '', b.location || '', b.dockReceiptDate || '',
         b.businessUnit || '', b.reference || '', b.palletId || '',
         b.addedDate || b.dockReceiptDate || '', b.lengthCm || '', b.widthCm || '', b.heightCm || '',
-        fmtVolume(vol), r.inStock ? '' : (b.departedDate || ''), r.inStock ? '' : '最後'
+        fmtVolume(vol), r.shipped ? (b.departedDate || '') : '', r.shipped ? '最後' : ''
       ];
       lines.push(cells.map(csvCell).join(','));
     });
