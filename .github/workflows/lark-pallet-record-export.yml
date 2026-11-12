@@ -1,0 +1,61 @@
+# ADD THIS FILE VIA THE GITHUB WEB EDITOR — The GitHub App cannot
+# push .github/workflows/*.yml files.
+# Copy this file to .github/workflows/lark-pallet-record-export.yml
+# in the repo (web editor: repo -> Add file -> Create new file ->
+# paste -> Commit). Nightly export of the Lark "Pallet record"
+# table to daily-record.json (repo root), which the website's
+# 每日記錄 (Excel) view reads. Runs every night at 20:30 HKT,
+# half an hour after the 20:00 record sync, so the export always
+# includes that night's new snapshot. Also runnable manually
+# (workflow_dispatch) to generate the file on demand.
+#
+# Repo secrets needed (already set for the nightly record sync):
+#   LARK_APP_ID       Lark self-built app id
+#   LARK_APP_SECRET   same app's secret
+#   LARK_APP_TOKEN    Base app_token (QDo5bSOZraNgEhsRC7flOUMggPe)
+# The job only READS Lark (never writes to it) and commits the
+# generated JSON back to the repo with the default GITHUB_TOKEN.
+# Pushing daily-record.json triggers a Pages rebuild (the file is
+# served by Pages), but no other workflow (none of them trigger
+# on push), so there is no loop.
+
+name: Lark pallet record export (Pallet record -> daily-record.json)
+
+on:
+  schedule:
+    # 20:30 HKT = 12:30 UTC, after the 20:00 record sync.
+    - cron: "30 12 * * *"
+  workflow_dispatch:
+
+# Serialize runs: two overlapping exports could both commit, and
+# an export running while the 20:00 record sync is still appending
+# would miss that night's rows. The 30-minute gap makes overlap
+# unlikely; the group is a backstop.
+concurrency:
+  group: lark-pallet-record-export
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Export Pallet record to daily-record.json
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+        run: python3 lark_pallet_record_export.py
+      - name: Commit daily-record.json if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add daily-record.json
+          git diff --cached --quiet || git commit -m "Update daily-record.json (nightly Pallet record export)"
+          git push
