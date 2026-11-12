@@ -1,0 +1,65 @@
+# ADD THIS FILE VIA THE GITHUB WEB EDITOR — The GitHub App cannot
+# push .github/workflows/*.yml files.
+# Copy this file to .github/workflows/lark-pallet-fix-date.yml
+# in the repo (web editor: repo -> Add file -> Create new file ->
+# paste -> Commit). One-off fix: rewrite the Daily Measurement
+# Date of Pallet record rows that were imported with the wrong
+# date (2026-10-30 instead of 2026-11-01, 142 rows) and recompute
+# their M-key (serial 46327 + Batch#). Manual run only
+# (workflow_dispatch); dry_run defaults to true so a run changes
+# nothing until the operator flips it off.
+#
+# Repo secrets needed (already set for the record sync / export):
+#   LARK_APP_ID       Lark self-built app id
+#   LARK_APP_SECRET   same app's secret
+#   LARK_APP_TOKEN    Base app_token (QDo5bSOZraNgEhsRC7flOUMggPe)
+# The job WRITES to the Pallet record table (the app has the
+# Editor role on it). It only touches rows whose Daily
+# Measurement Date equals date_from, and it verifies by
+# re-reading afterwards; a re-run after a successful fix finds
+# 0 rows and changes nothing.
+
+name: Lark pallet fix date
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (true = report only, do not write)"
+        required: false
+        default: "true"
+        type: boolean
+      date_from:
+        description: "Wrong date to fix (YYYY-MM-DD)"
+        required: false
+        default: "2026-10-30"
+      date_to:
+        description: "Correct date (YYYY-MM-DD)"
+        required: false
+        default: "2026-11-01"
+
+# Serialize runs: two overlapping fixes could both rewrite the
+# same rows. There is no schedule; this is a one-off manual job.
+concurrency:
+  group: lark-pallet-fix-date
+  cancel-in-progress: false
+
+jobs:
+  fix-date:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fix Daily Measurement Date
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+          LARK_APP_TOKEN: ${{ secrets.LARK_APP_TOKEN }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python3 lark_pallet_fix_date.py --date-from "${{ inputs.date_from }}" --date-to "${{ inputs.date_to }}" --dry-run
+          else
+            python3 lark_pallet_fix_date.py --date-from "${{ inputs.date_from }}" --date-to "${{ inputs.date_to }}"
+          fi
