@@ -337,6 +337,7 @@
   function excelRows() {
     var filter = $('excelFilter').value;
     var q = $('excelSearch').value.trim();
+    var date = $('excelDate').value;
     var rows = [];
     state.inStock.forEach(function (b) { rows.push({ b: b, inStock: true }); });
     state.departed.forEach(function (b) { rows.push({ b: b, inStock: false }); });
@@ -345,6 +346,11 @@
     if (q) {
       var nq = norm(q);
       rows = rows.filter(function (r) { return norm(r.b.palletId).indexOf(nq) !== -1; });
+    }
+    if (date) {
+      rows = rows.filter(function (r) {
+        return String(r.b.addedDate || r.b.dockReceiptDate || '').slice(0, 10) === date;
+      });
     }
     return rows;
   }
@@ -464,6 +470,7 @@
   $('stockSearch').addEventListener('input', renderStock);
   $('excelFilter').addEventListener('change', renderExcel);
   $('excelSearch').addEventListener('input', renderExcel);
+  $('excelDate').addEventListener('change', renderExcel);
   $('csvBtn').addEventListener('click', exportCsv);
 
   $('addBtn').addEventListener('click', function () {

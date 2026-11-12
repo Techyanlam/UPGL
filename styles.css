@@ -48,6 +48,7 @@ th { background: #f8fafc; color: #374151; }
 .activity { padding-left: 18px; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .toolbar input, .toolbar select { width: auto; flex: 1; min-width: 140px; }
+.toolbar label { display: inline; margin: 0; font-size: 14px; white-space: nowrap; }
 .toolbar .btn { margin-top: 0; }
 footer { text-align: center; color: #9ca3af; font-size: 12px; padding: 16px; }
 @media (max-width: 640px) {
