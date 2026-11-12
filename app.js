@@ -23,6 +23,15 @@
     }).then(function (j) {
       dailyRecord = j;
       dailyRecordLoading = false;
+      // 今日未有快照（今晚 20:00 同步先寫）就顯示最新有數嗰日，
+      // 唔好留低一個 0 行嘅今日。
+      var latest = '';
+      (dailyRecord.rows || []).forEach(function (r) {
+        if (r.dmd && r.dmd > latest) latest = r.dmd;
+      });
+      var cur = $('excelDate').value;
+      var hasCur = (dailyRecord.rows || []).some(function (r) { return r.dmd === cur; });
+      if (latest && !hasCur) $('excelDate').value = latest;
       renderExcel();
     }).catch(function () {
       dailyRecord = false;
