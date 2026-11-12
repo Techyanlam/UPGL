@@ -9,6 +9,28 @@
   var state = { inStock: [], departed: [], pending: [], activity: [] };
   var selectedDepart = null;
 
+  // 每日記錄（Excel 版面改做每日記錄）：讀 Lark Pallet record 嘅
+  // 每日快照（daily-record.json，每晚由 GitHub Actions 匯出），
+  // 唔再用 Worker 嘅即時倉存。null = 未載入，false = 載入失敗。
+  var dailyRecord = null;
+  var dailyRecordLoading = false;
+  function loadDailyRecord() {
+    if (dailyRecord !== null || dailyRecordLoading) return;
+    dailyRecordLoading = true;
+    fetch('daily-record.json').then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      dailyRecord = j;
+      dailyRecordLoading = false;
+      renderExcel();
+    }).catch(function () {
+      dailyRecord = false;
+      dailyRecordLoading = false;
+      renderExcel();
+    });
+  }
+
   var $ = function (id) { return document.getElementById(id); };
 
   function todayStr() {
@@ -340,8 +362,17 @@
     var q = $('excelSearch').value.trim();
     var date = $('excelDate').value;
     var rows = [];
-    state.inStock.forEach(function (b) { rows.push({ b: b, inStock: true }); });
-    state.departed.forEach(function (b) { rows.push({ b: b, inStock: false }); });
+    if (!dailyRecord || !dailyRecord.rows) return rows;
+    dailyRecord.rows.forEach(function (r) {
+      var b = {
+        palletId: r.palletId, location: r.location,
+        dockReceiptDate: r.dockReceiptDate, businessUnit: r.businessUnit,
+        reference: r.reference, lengthCm: r.lengthCm, widthCm: r.widthCm,
+        heightCm: r.heightCm, volumeCbm: r.volumeCbm,
+        addedDate: r.dmd, departedDate: r.shipDate || ''
+      };
+      rows.push({ b: b, inStock: !r.shipDate });
+    });
     if (filter === 'in') rows = rows.filter(function (r) { return r.inStock; });
     if (filter === 'out') rows = rows.filter(function (r) { return !r.inStock; });
     if (q) {
@@ -350,7 +381,7 @@
     }
     if (date) {
       rows = rows.filter(function (r) {
-        return String(r.b.addedDate || r.b.dockReceiptDate || '').slice(0, 10) === date;
+        return String(r.b.addedDate || '').slice(0, 10) === date;
       });
     }
     return rows;
@@ -359,6 +390,17 @@
   function renderExcel() {
     var body = $('excelBody');
     body.innerHTML = '';
+    if (dailyRecord === null) {
+      loadDailyRecord();
+      body.innerHTML = '<tr><td colspan="13">載入每日記錄…</td></tr>';
+      $('excelTotals').textContent = '';
+      return;
+    }
+    if (dailyRecord === false) {
+      body.innerHTML = '<tr><td colspan="13">每日記錄未能載入（daily-record.json 未生成）。</td></tr>';
+      $('excelTotals').textContent = '';
+      return;
+    }
     var rows = excelRows();
     var totalVol = 0;
     rows.forEach(function (r) {
@@ -411,7 +453,7 @@
     var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'UPGL-' + todayStr() + '.csv';
+    a.download = 'UPGL-' + ($('excelDate').value || todayStr()) + '.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -508,6 +550,7 @@
   // 預設值
   $('departDate').value = todayStr();
   $('addDate').value = todayStr();
+  $('excelDate').value = todayStr();
 
   loadState();
 })();
